@@ -32,10 +32,13 @@ description: |
 # gst-plugins-base pulls the codec libraries — as are zlib, zstd and
 # systemd-libs, which are base-system everywhere this ships.
 #
-# The Debian entries carry alternatives because Ubuntu 24.04's 64-bit time_t
-# transition renamed these packages: 24.04 has the `t64` name, Debian 12 and
+# Two Debian entries carry alternatives because Ubuntu 24.04's 64-bit time_t
+# transition renamed those packages: 24.04 has the `t64` name, Debian 12 and
 # Ubuntu 22.04 have the plain one, and a single package has to install on
-# both. The Arch names are checked against a live Arch system and are
+# both. Only poppler-glib and glib2.0 were renamed — the GStreamer packages
+# kept their names in every suite, so listing a `t64` alternative for them
+# would name a package that has never existed. Each name here was checked
+# against the Ubuntu package index for both jammy and noble. The Arch names are checked against a live Arch system and are
 # validated again by arch-repo.yml's container install test; the deb and rpm
 # names are derived from each distro's own SONAME-to-package mapping and are
 # not install-tested by the pipeline.
@@ -46,8 +49,8 @@ overrides:
       - libpoppler-glib8t64 | libpoppler-glib8
       - libcairo2
       - libglib2.0-0t64 | libglib2.0-0
-      - libgstreamer1.0-0t64 | libgstreamer1.0-0
-      - libgstreamer-plugins-base1.0-0t64 | libgstreamer-plugins-base1.0-0
+      - libgstreamer1.0-0
+      - libgstreamer-plugins-base1.0-0
   rpm:
     depends:
       - libxkbcommon
