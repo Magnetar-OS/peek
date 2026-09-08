@@ -46,7 +46,16 @@ jobs:
         cargo build --release --locked
         just rootdir="$PWD/.release-kit/pkgroot" install
       binary_path: 'target/release/$RK_BINARY'
-      apt_packages: 'libxkbcommon-dev'
+      # Everything the build links, which is what ci.yml installs minus the
+      # metadata validators. `libxkbcommon-dev` alone was not enough: the kit
+      # runs a clippy gate before the build, and poppler, cairo and GStreamer
+      # are all resolved through pkg-config at that point, so the leg died in
+      # `gstreamer-sys`'s build script long before any lint ran.
+      apt_packages: >-
+        pkg-config
+        libpoppler-glib-dev libcairo2-dev
+        libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+        libxkbcommon-dev libwayland-dev libinput-dev libudev-dev
       # No AppImage yet: the apps ship SVG icons only and the AppImage leg
       # needs a 256x256 PNG (kit README, icon input). Add 'appimage' here
       # plus the PNG when wanted.
