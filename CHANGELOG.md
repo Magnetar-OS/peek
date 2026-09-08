@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.1.0] — 2026-09-08
 
 ### Added
 
@@ -78,3 +78,5 @@ All notable changes to this project are documented here. The format follows
 - Every string the overlay shows is now translatable: MIME type names and
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
+
+[0.1.0]: https://github.com/entro314-labs/peek/releases/tag/v0.1.0
