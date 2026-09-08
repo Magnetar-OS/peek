@@ -75,7 +75,7 @@ jobs:
     with:
       tag: ${{ inputs.tag || '' }}
       product_name: 'peek'
-      repo_name: 'magnetaros'
+      repo_name: 'magnetar'
       pages_repo: 'Magnetar-OS/arch-repo'
     secrets: inherit
 
