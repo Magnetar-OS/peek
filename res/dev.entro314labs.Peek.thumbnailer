@@ -1,0 +1,11 @@
+# Thumbnails from the same decoders the previewer shows files with, so the
+# icon in the file manager and the preview over it can never disagree.
+#
+# The MIME list is deliberately the formats where this thumbnailer adds
+# something: documents, camera raw, video posters, audio cover art, and the
+# image formats gdk-pixbuf installations commonly lack. Plain PNG and JPEG are
+# left to the file manager's own loader, which already does them well.
+[Thumbnailer Entry]
+TryExec=peek-thumbnailer
+Exec=peek-thumbnailer %i %o %s
+MimeType=application/vnd.comicbook+zip;application/x-cbz;application/epub+zip;application/pdf;application/x-pdf;image/svg+xml;image/svg+xml-compressed;image/avif;image/webp;image/x-exr;image/vnd.radiance;image/qoi;image/x-qoi;image/tiff;image/x-tga;image/x-dds;image/x-adobe-dng;image/x-canon-cr2;image/x-canon-crw;image/x-fuji-raf;image/x-kodak-dcr;image/x-kodak-kdc;image/x-minolta-mrw;image/x-nikon-nef;image/x-nikon-nrw;image/x-olympus-orf;image/x-panasonic-raw;image/x-panasonic-rw2;image/x-pentax-pef;image/x-samsung-srw;image/x-sony-arw;image/x-sony-sr2;image/x-sony-srf;video/mp4;video/mpeg;video/quicktime;video/webm;video/x-matroska;video/x-msvideo;video/x-flv;video/ogg;video/3gpp;video/x-ms-wmv;audio/mpeg;audio/flac;audio/ogg;audio/mp4;audio/x-m4a;audio/x-wav;audio/x-ms-wma;audio/aac;audio/opus;

@@ -1,0 +1,14 @@
+# An example command plugin, not installed by default.
+#
+# Blender ships `blender-thumbnailer`, which takes exactly the arguments this
+# contract does — which is the point of the contract. Copy this file to
+# ~/.local/share/peek/plugins/ to enable it.
+name = "Blender scenes"
+
+[[previewer]]
+extensions = ["blend"]
+mime_types = ["application/x-blender"]
+handler = "command"
+command = "blender-thumbnailer %i %o"
+output = "image"
+timeout = 4000

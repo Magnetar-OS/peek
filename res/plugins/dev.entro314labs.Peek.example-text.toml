@@ -1,0 +1,15 @@
+# An example declarative plugin, not installed by default.
+#
+# Some formats are only unsupported because nothing tells peek they are text.
+# This is the whole fix: no code, no process, no decoder.
+name = "Extra source formats"
+
+[[previewer]]
+extensions = ["gleam"]
+handler = "text"
+syntax = "Rust"
+
+[[previewer]]
+extensions = ["just", "justfile"]
+handler = "text"
+syntax = "Makefile"

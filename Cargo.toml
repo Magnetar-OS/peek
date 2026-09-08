@@ -1,0 +1,121 @@
+[workspace]
+resolver = "3"
+members = ["crates/peek-engine", "crates/peek-thumbnailer"]
+
+[workspace.package]
+edition = "2024"
+# Matches libcosmic and the COSMIC applications, rather than whatever toolchain
+# happened to be installed when this was written.
+rust-version = "1.93"
+repository = "https://github.com/entro314-labs/peek"
+# Poppler, the only PDF renderer actually shipped on a Linux desktop, is GPL.
+# That decides the licence for the whole workspace including the engine crate —
+# unlike `light`, where the engine could stay MPL-2.0 because nothing it linked
+# forced otherwise. A future GTK4 frontend is therefore GPL too, which costs
+# nothing: it would be linking the same poppler.
+license = "GPL-3.0-or-later"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
+tracing = "0.1"
+thiserror = "2"
+
+[package]
+name = "peek"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "A QuickLook-class file previewer for COSMIC"
+readme = "README.md"
+# Not published to crates.io, and it cannot be: libcosmic is distributed only as
+# a git repository, and Cargo refuses to publish a crate with a git dependency.
+# That is true of every COSMIC application, not a gap in this one. The app ships
+# as deb/rpm/arch/flatpak — see the release workflow. The engine crate is the
+# half that is publishable, and it is published.
+publish = false
+
+[dependencies]
+peek-engine = { path = "crates/peek-engine" }
+
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# The journal, when there is one. A daemon started by D-Bus activation or by a
+# desktop entry has a stderr the user cannot find.
+tracing-journald = "0.3"
+
+# Translations. Fluent catalogues embedded in the binary, which is what every
+# COSMIC application does.
+#
+# The desktop entry and the metainfo are checked in under `res/` and installed
+# as they are, the way cosmic-launcher and cosmic-app-library do it. The newer
+# `xdgen` build script in cosmic-app-template would generate their translated
+# variants from these same catalogues, but adding it as a build dependency
+# re-resolves the graph in a way that drops zbus's `blocking` feature and breaks
+# libcosmic's `single-instance` support — so the localised `Name[xx]=` lines go
+# in by hand until that is sorted out upstream.
+i18n-embed = { version = "0.16", features = ["fluent-system", "desktop-requester"] }
+i18n-embed-fl = "0.10"
+rust-embed = "8"
+
+
+# The previewer service is served on its own connection, separate from the one
+# libcosmic's single-instance support owns. See `src/previewer.rs`.
+zbus = { version = "5.19", default-features = false, features = ["tokio"] }
+
+# `Url` is what libcosmic hands back from a D-Bus `Open`, so paths have to make
+# the round trip through it.
+url = "2"
+
+# Resolving a remote URI to the place GVFS already mounted it. GIO is the only
+# thing that knows that mapping, and it is already in the tree through
+# GStreamer — see `previewer::path_from_uri`.
+gio = "0.22"
+
+[dependencies.libcosmic]
+git = "https://github.com/pop-os/libcosmic.git"
+features = [
+    # Accessibility support.
+    "a11y",
+    # Config lives in cosmic-config and is watched rather than polled, so a
+    # settings change lands without restarting a process that stays resident.
+    "dbus-config",
+    # Needed to look up the handler application for "Open" and for the icons
+    # shown on unpreviewable files.
+    "desktop",
+    # The file being previewed opens in its own systemd scope, so it outlives
+    # the previewer rather than dying with it.
+    "desktop-systemd-scope",
+    # File names come from the filesystem, so the title bar has to render
+    # whatever is on disk — including scripts that need shaping.
+    "advanced-shaping",
+    # Required: the overlay is a wlr-layer-shell surface, not an xdg-toplevel.
+    "wayland",
+    # GPU-accelerated rendering. Video frames are uploaded per frame, so this
+    # is not optional.
+    "wgpu",
+    # A second `peek` invocation must reach the running daemon rather than
+    # opening a second overlay.
+    "single-instance",
+    # tokio drives preview loading and the previewer service.
+    "tokio",
+]
+
+[profile.release]
+# Previewing is judged on the delay between pressing space and seeing the file.
+# Everything before the first frame is on that path.
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+strip = "symbols"
+
+# Decoding a 40-megapixel photo or a PDF page in an unoptimised dependency
+# build takes long enough to make a debug binary useless for judging feel.
+[profile.dev.package."*"]
+opt-level = 3

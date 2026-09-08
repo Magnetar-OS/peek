@@ -1,0 +1,85 @@
+# Flatpak manifest.
+#
+# A previewer is an unusual thing to sandbox, and the permissions below are
+# the honest consequence of what it does rather than a copied boilerplate:
+#
+#   * It maps a `wlr-layer-shell` surface, which the portal has no equivalent
+#     for — `--socket=wayland` plus the layer-shell protocol is the only way an
+#     overlay above the panel exists at all.
+#   * It is pointed at whatever file the user selected, from a file manager
+#     running outside the sandbox. A document portal handle would work for a
+#     file the user picked in a dialog; a previewer never opens a dialog. So it
+#     reads the host filesystem, read-only.
+#   * It serves `org.gnome.NautilusPreviewer2` so the space bar reaches it.
+#
+# Nothing here is write access: `peek` renders files and never modifies them,
+# which is the one property that makes read-only host access defensible.
+app-id: dev.entro314labs.Peek
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: peek
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/peek/cargo
+
+finish-args:
+  - --socket=wayland
+  # Video and audio previews play through GStreamer.
+  - --socket=pulseaudio
+  # wgpu needs the GPU; the overlay uploads a video frame per displayed frame.
+  - --device=dri
+  # Read-only, and the reason is above.
+  - --filesystem=host:ro
+  # The previewer interface the file manager calls, and the name peek owns.
+  - --own-name=org.gnome.NautilusPreviewer
+  - --own-name=dev.entro314labs.Peek
+  # Opening a file in its real application has to leave the sandbox.
+  - --talk-name=org.freedesktop.portal.OpenURI
+  # Settings live in cosmic-config, which is read through the session bus.
+  - --talk-name=com.system76.CosmicSettingsDaemon
+
+modules:
+  - name: poppler
+    # The PDF renderer. Not in the freedesktop runtime, and the reason the
+    # whole workspace is GPL — see the workspace manifest.
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DENABLE_GLIB=ON
+      - -DENABLE_QT5=OFF
+      - -DENABLE_QT6=OFF
+      - -DENABLE_BOOST=OFF
+      - -DBUILD_GTK_TESTS=OFF
+      - -DBUILD_CPP_TESTS=OFF
+      - -DENABLE_UTILS=OFF
+    sources:
+      - type: archive
+        url: https://poppler.freedesktop.org/poppler-25.08.0.tar.xz
+        sha256: 0e42e6a6a0e6a8bbb0e6d4ee9f0e64a0e7e0e0a0e0a0e0a0e0a0e0a0e0a0e0a0
+        # TODO: replace with the real checksum before this manifest is
+        # submitted anywhere. Left obviously wrong rather than plausibly
+        # wrong, so it cannot be mistaken for verified.
+
+  - name: peek
+    buildsystem: simple
+    build-commands:
+      - cargo --offline fetch --manifest-path Cargo.toml --verbose
+      - cargo --offline build --release --workspace
+      - install -Dm0755 target/release/peek /app/bin/peek
+      - install -Dm0755 target/release/peek-thumbnailer /app/bin/peek-thumbnailer
+      - install -Dm0644 res/dev.entro314labs.Peek.desktop /app/share/applications/dev.entro314labs.Peek.desktop
+      - install -Dm0644 res/dev.entro314labs.Peek.metainfo.xml /app/share/metainfo/dev.entro314labs.Peek.metainfo.xml
+      - install -Dm0644 res/dev.entro314labs.Peek.thumbnailer /app/share/thumbnailers/dev.entro314labs.Peek.thumbnailer
+      - install -Dm0644 res/icons/hicolor/scalable/apps/dev.entro314labs.Peek.svg /app/share/icons/hicolor/scalable/apps/dev.entro314labs.Peek.svg
+      - install -Dm0644 res/plugins/README.md /app/share/peek/plugins/README.md
+    sources:
+      - type: dir
+        path: ../..
+      # `flatpak-cargo-generator.py` produces this from Cargo.lock; it is not
+      # checked in because it is generated and enormous.
+      - generated-sources.json

@@ -1,0 +1,139 @@
+.\" Copyright 2026 entro314-labs
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.TH PEEK 1 "2026-09-07" "peek" "User Commands"
+.SH NAME
+peek \- preview files without opening them
+.SH SYNOPSIS
+.B peek
+.RI [ FILE .\|.\|.]
+.SH DESCRIPTION
+.B peek
+is a QuickLook-class file previewer for the COSMIC desktop. Pointed at a file,
+it shows the file \(em the picture, the pages, the video, the source with its
+syntax coloured, the contents of the archive \(em without opening an
+application.
+.PP
+The first invocation becomes a resident daemon and stays running; later
+invocations reach it over D-Bus. That is deliberate: creating a wgpu device,
+deserialising the syntax set, and building GStreamer's registry all happen once
+at startup rather than once per keypress, and the daemon is what keeps the
+previewer service on the bus for a file manager to find.
+.PP
+With no arguments,
+.B peek
+toggles the last preview, which is what makes the command itself the right
+thing to bind to a keyboard shortcut.
+.SH OPTIONS
+.B peek
+takes file paths and no flags. Everything else is a setting; see
+.B CONFIGURATION .
+.SH KEYS
+.TP
+.B Space ", " Esc
+Back: leave the index sheet or fullscreen if either is showing, and close the
+preview otherwise.
+.TP
+.B Left ", " Right
+Previous and next file, or the previous and next cell in the index sheet.
+.TP
+.B Up ", " Down
+Previous and next page \(em or file, where there are no pages, or a row in the
+index sheet.
+.TP
+.B Shift+Left ", " Shift+Right
+Seek five seconds through a media file.
+.TP
+.B P
+Play and pause.
+.TP
+.BR + ", " - ", " 0
+Zoom in, out, and back to the natural fit.
+.TP
+.B F ", " F11
+Fullscreen: the chrome yields and the file gets the display.
+.TP
+.B G
+The index sheet: every file in the selection, at once.
+.TP
+.B Ctrl+C
+Copy the file's path.
+.TP
+.B Enter
+Open in the default application, or open the cell the index sheet's cursor is
+on.
+.PP
+The pointer works too: scrolling over an image, page, or video zooms it,
+dragging pans it once zoom has cropped it, and double-clicking jumps between
+the fitted view and the file's own pixels.
+.SH CONFIGURATION
+Settings are reachable from the gear in the overlay's header, and are stored
+through
+.BR cosmic-config ,
+under
+.IR ~/.config/cosmic/dev.entro314labs.Peek/v1/ ,
+one RON file per key. Changes are applied live.
+.PP
+The keys are
+.BR blur ,
+.BR opacity ,
+.BR autoplay ,
+.BR loop_media ,
+.BR line_numbers ,
+.BR max_fraction ,
+.BR nautilus_previewer ,
+.BR follow_selection ,
+.BR click_away ,
+and
+.BR animate .
+An unset key uses its default; an unreadable one is logged and falls back, so a
+bad value cannot stop a preview opening.
+.SH PLUGINS
+File types
+.B peek
+does not handle can be added with a TOML file in
+.IR ~/.local/share/peek/plugins/ ,
+either by routing the type to a previewer that already exists or by naming a
+command that renders it. Plugins are consulted only for files that would
+otherwise show the metadata card, so installing one cannot change or break an
+existing preview. See the
+.I README
+in
+.I /usr/share/peek/plugins/
+for the format.
+.SH THE SPACE BAR
+.B peek
+serves
+.BR org.gnome.NautilusPreviewer2 ,
+which is the interface a file manager calls when the space bar is pressed, so
+in Nautilus the gesture works with no further setup. GNOME's own previewer,
+.BR sushi ,
+claims the same bus name;
+.B peek
+asks to replace it and hands it back on exit. To make the takeover survive a
+reboot:
+.PP
+.RS
+.B systemctl --user mask --now org.gnome.NautilusPreviewer.service
+.RE
+.SH FILES
+.TP
+.I ~/.config/cosmic/dev.entro314labs.Peek/v1/
+Settings, one file per key.
+.TP
+.I ~/.local/share/peek/plugins/
+Plugin manifests.
+.SH ENVIRONMENT
+.TP
+.B RUST_LOG
+Log filter, e.g.
+.BR peek=debug .
+Logs go to the journal \(em
+.B journalctl --user -t peek -f
+\(em and to stderr only when there is no journal to write to, because a daemon
+started by D-Bus activation has a stderr nobody can see.
+.TP
+.B PEEK_PLUGIN_DIR
+Overrides the plugin search path entirely. For testing a plugin without
+installing it.
+.SH SEE ALSO
+.BR peek-thumbnailer (1)

@@ -1,0 +1,5 @@
+# Fluent catalogues, in the layout i18n-embed and Weblate both expect.
+fallback_language = "en"
+
+[fluent]
+assets_dir = "i18n"

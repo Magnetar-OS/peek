@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.entro314labs.Peek</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Peek</name>
+  <summary>Preview files without opening them</summary>
+
+  <description>
+    <p>
+      Peek is a QuickLook-class file previewer for the COSMIC desktop. Point it at
+      a file and it shows you the file — the picture, the pages, the video, the
+      source with its syntax coloured, the contents of the archive — without
+      opening an application.
+    </p>
+    <p>
+      It maps a layer-shell overlay above the panel, takes the keyboard while it
+      is open, and gets out of the way on the next key press. The arrow keys walk
+      the rest of the directory.
+    </p>
+    <p>Formats it previews:</p>
+    <ul>
+      <li>Images, with EXIF orientation applied and camera details shown</li>
+      <li>SVG, rendered at display size rather than scaled from a thumbnail</li>
+      <li>PDF, with page navigation</li>
+      <li>Source and plain text, with syntax highlighting in light and dark</li>
+      <li>Video and audio, with real playback, seeking, and a poster frame</li>
+      <li>Archives, listed without being extracted</li>
+      <li>Directories, summarised — and anything else as a metadata card</li>
+    </ul>
+    <p>
+      Peek serves org.gnome.NautilusPreviewer2, so the space bar previews the
+      selection in Nautilus with no further setup.
+    </p>
+  </description>
+
+  <developer id="dev.entro314labs">
+    <name>entro314 labs</name>
+  </developer>
+
+  <url type="homepage">https://github.com/entro314-labs/peek</url>
+  <url type="bugtracker">https://github.com/entro314-labs/peek/issues</url>
+  <url type="vcs-browser">https://github.com/entro314-labs/peek</url>
+
+  <launchable type="desktop-id">dev.entro314labs.Peek.desktop</launchable>
+
+  <provides>
+    <binary>peek</binary>
+  </provides>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+
+  <recommends>
+    <control>keyboard</control>
+  </recommends>
+
+  <supports>
+    <control>pointing</control>
+  </supports>
+
+  <categories>
+    <category>Utility</category>
+    <category>Viewer</category>
+    <category>COSMIC</category>
+  </categories>
+
+  <keywords>
+    <keyword>preview</keyword>
+    <keyword>quicklook</keyword>
+    <keyword>viewer</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="0.1.0" date="2026-08-24">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

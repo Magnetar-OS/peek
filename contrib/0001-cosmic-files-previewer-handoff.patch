@@ -1,0 +1,161 @@
+From ebbcf656b5efac16da309ddfce20daa4bcc04da3 Mon Sep 17 00:00:00 2001
+From: Dominikos Pritis <hey@myroomie.gr>
+Date: Mon, 7 Sep 2026 11:27:38 +0300
+Subject: [PATCH] feat: hand unpreviewable files to the desktop previewer on
+ space
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Pressing space in cosmic-files binds to `GalleryToggle`, which only acts on
+items where `can_gallery()` is true — images and text. For a PDF, a video, an
+audio file, or an archive, the key currently does nothing at all.
+
+The gesture already exists; it just never leaves the process. This makes it
+leave: when nothing in the selection is something the built-in gallery can
+show, call `ShowFile` on `org.gnome.NautilusPreviewer2`. That is the standard
+desktop interface for "preview the selection" — the one Nautilus has called
+for years and GNOME's `sushi` serves — so this works with any installed
+previewer rather than blessing a particular one.
+
+Images and text are untouched: the built-in gallery still handles them, and
+the new path is reached only when the loop finds nothing it can show. If no
+previewer is installed the call fails and is logged at debug, which leaves the
+behaviour exactly as it is today.
+
+zbus is already in the dependency graph through libcosmic; naming it directly
+costs no additional build.
+---
+ Cargo.lock |  1 +
+ Cargo.toml |  4 +++
+ src/tab.rs | 75 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 79 insertions(+), 1 deletion(-)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 757d1bf..6de92da 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1452,6 +1452,7 @@ dependencies = [
+  "xdg",
+  "xdg-mime",
+  "xdgen",
++ "zbus 5.19.0",
+  "zip",
+ ]
+ 
+diff --git a/Cargo.toml b/Cargo.toml
+index 363ed44..022c908 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -36,6 +36,10 @@ tokio = { version = "1", features = ["process", "sync"] }
+ trash = "5.2.6"
+ url = "2.5"
+ walkdir = "2.5.0"
++# Already in the dependency graph through libcosmic; named directly so the
++# previewer handoff in `tab.rs` can make one method call. See
++# `show_in_previewer`.
++zbus = { version = "5", default-features = false, features = ["tokio"] }
+ wayland-client = { version = "0.31.14", optional = true }
+ xdg = { version = "3.0", optional = true }
+ xdg-mime = { git = "https://github.com/ebassi/xdg-mime-rs" }
+diff --git a/src/tab.rs b/src/tab.rs
+index 79a5091..e00e4fc 100644
+--- a/src/tab.rs
++++ b/src/tab.rs
+@@ -4015,15 +4015,43 @@ impl Tab {
+             }
+             Message::GalleryToggle => {
+                 if let Some(indices) = self.column_sort() {
++                    // The first selected item the built-in gallery cannot
++                    // show, kept in case none of them can.
++                    let mut external_opt = None;
++                    let mut gallery_opened = false;
++
+                     for (_, item) in &indices {
+-                        if item.selected && item.can_gallery() {
++                        if !item.selected {
++                            continue;
++                        }
++                        if item.can_gallery() {
+                             self.gallery = !self.gallery;
+ 
+                             if self.gallery {
+                                 commands.extend(self.trigger_async_decode());
+                             }
++                            gallery_opened = true;
+                             break;
+                         }
++                        if external_opt.is_none() {
++                            external_opt = item.path_opt().cloned();
++                        }
++                    }
++
++                    // Nothing in the selection is an image or text, so the
++                    // gallery has nothing to show and pressing space would
++                    // otherwise do nothing at all. Hand the file to the
++                    // desktop's previewer service instead: that is the same
++                    // interface Nautilus uses, so this works with GNOME's
++                    // sushi and with any other previewer that claims the name.
++                    if !gallery_opened
++                        && let Some(path) = external_opt
++                    {
++                        commands.push(Command::Iced(
++                            cosmic::iced::Task::future(show_in_previewer(path))
++                                .discard()
++                                .into(),
++                        ));
+                     }
+                 }
+             }
+@@ -8050,3 +8078,48 @@ mod tests {
+         Ok(())
+     }
+ }
++
++/// Ask the desktop's file previewer to show a file.
++///
++/// `org.gnome.NautilusPreviewer2` is the only interface on Linux for "preview
++/// the selection": Nautilus has called it for years, GNOME's `sushi` serves
++/// it, and so do third-party previewers. Calling it here means the space bar
++/// does something for the file types the built-in gallery does not handle,
++/// rather than nothing.
++///
++/// Fire-and-forget. No previewer may be installed, which is not an error — it
++/// is the same situation as before this call existed, and the user simply sees
++/// no preview.
++async fn show_in_previewer(path: PathBuf) {
++    const NAME: &str = "org.gnome.NautilusPreviewer";
++    const PATH: &str = "/org/gnome/NautilusPreviewer";
++    const INTERFACE: &str = "org.gnome.NautilusPreviewer2";
++
++    let Some(uri) = url::Url::from_file_path(&path).ok().map(String::from) else {
++        return;
++    };
++
++    let connection = match zbus::Connection::session().await {
++        Ok(connection) => connection,
++        Err(err) => {
++            log::debug!("failed to reach the session bus: {err}");
++            return;
++        }
++    };
++
++    // (uri, window_handle, close_if_already_shown, activation_token). The
++    // window handle is empty because the previewer maps its own surface; the
++    // toggle flag is true so a second press of space closes the preview.
++    if let Err(err) = connection
++        .call_method(
++            Some(NAME),
++            PATH,
++            Some(INTERFACE),
++            "ShowFile",
++            &(uri.as_str(), "", true, ""),
++        )
++        .await
++    {
++        log::debug!("no file previewer answered: {err}");
++    }
++}
+-- 
+2.55.0
+

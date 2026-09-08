@@ -1,0 +1,127 @@
+[package]
+name = "peek-engine"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+# GPL rather than MPL, unlike light-core: this crate links poppler, and poppler
+# is GPL. See the workspace manifest.
+license.workspace = true
+description = "Type detection and preview rendering for the Peek previewer"
+readme = "README.md"
+keywords = ["preview", "thumbnail", "quicklook", "mime", "cosmic"]
+categories = ["multimedia::images", "filesystem", "parser-implementations"]
+# The vendored themes and the fixtures the tests generate are the only things
+# under the crate root that are not source; `themes/` has to ship (it is
+# `include_str!`d), the target directory must not.
+exclude = ["/target"]
+
+# Two clusters of dependency are C libraries with system packages behind them,
+# and they are the only reason building this crate can fail on a machine that
+# has a Rust toolchain and nothing else. Gating them means a consumer that wants
+# type detection, images, text, or archives can take the crate with
+# `default-features = false` and build it anywhere.
+#
+# Detection is deliberately *not* gated: `Kind` still names a PDF as a PDF with
+# the `pdf` feature off, and `preview::load` falls back to the metadata card.
+# A previewer that cannot render a format still knows what the format is, and a
+# caller that gates on `Kind` rather than on features keeps working either way.
+[features]
+default = ["pdf", "media"]
+
+# PDF rendering through poppler-glib and cairo.
+# Needs: libpoppler-glib-dev, libcairo2-dev.
+pdf = ["dep:poppler-rs", "dep:cairo-rs", "dep:glib"]
+
+# Video and audio probing, poster frames, and playback through GStreamer.
+# Needs: libgstreamer1.0-dev, libgstreamer-plugins-base1.0-dev.
+media = ["dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video", "dep:gstreamer-pbutils"]
+
+[dependencies]
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+
+# MIME detection against the system shared-mime-info database. Pure Rust, and
+# it agrees with what the file manager shows, which matters when the user is
+# looking at the same file in both.
+tree_magic_mini = { version = "3.2", features = ["with-gpl-data"] }
+
+# Raster decoding. `image` already appears in the dependency tree through
+# libcosmic, so this adds a feature set rather than a new library.
+image = { version = "0.25", default-features = false, features = [
+    "bmp", "gif", "ico", "jpeg", "png", "pnm", "tga", "tiff", "webp",
+    "avif", "dds", "exr", "ff", "hdr", "qoi", "rayon",
+] }
+# SVG is a document format, not a raster one, so it needs a renderer rather
+# than a decoder.
+resvg = "0.48"
+
+exif = { package = "kamadak-exif", version = "0.6" }
+
+# PDF. poppler-glib is present on every desktop that ships a document viewer,
+# whereas pdfium has to be fetched as a binary and mupdf is AGPL.
+poppler-rs = { version = "0.26", optional = true }
+cairo-rs = { version = "0.22", features = ["png"], optional = true }
+glib = { version = "0.22", optional = true }
+
+# Media probing and playback. GStreamer is what every Linux desktop already
+# uses to decode video; reimplementing that was never on the table.
+gstreamer = { version = "0.25", optional = true }
+gstreamer-app = { version = "0.25", optional = true }
+gstreamer-video = { version = "0.25", optional = true }
+gstreamer-pbutils = { version = "0.25", optional = true }
+
+# Audio tags, so a music file previews as a track rather than as a blob.
+lofty = "0.25"
+
+# Archive listing. Contents are enumerated, never extracted — a previewer that
+# writes to disk to show you something is doing more than you asked.
+zip = { version = "8", default-features = false, features = ["deflate", "bzip2", "zstd", "lzma"] }
+tar = "0.4"
+flate2 = "1"
+bzip2 = "0.6"
+xz2 = "0.1"
+zstd = "0.14"
+sevenz-rust2 = "0.22.2"
+
+# Syntax highlighting for source files. `default-fancy` swaps oniguruma for
+# fancy-regex, keeping the build pure Rust.
+syntect = { version = "5.3", default-features = false, features = [
+    "default-fancy", "plist-load", "regex-fancy",
+] }
+
+# The syntax set cosmic-edit uses. Syntect's bundled defaults cover about forty
+# languages and miss TOML, TypeScript, and Dockerfiles — all of which the
+# desktop entry claims to preview.
+two-face = { version = "0.5", default-features = false, features = ["syntect-fancy"] }
+
+# Font metadata for the specimen card. A parser, not a rasteriser: drawing the
+# specimen is the frontend's text stack doing what it already does, with the
+# file's bytes registered as a font.
+ttf-parser = "0.25"
+
+# Plugin manifests. TOML rather than RON or JSON: a plugin is written by hand
+# by someone who is not a Rust programmer, and TOML is the format they already
+# know from every other tool's config.
+toml = "1"
+
+# XML for the formats that are zipped XML: EPUB packaging, DOCX and ODT text.
+# Streaming, so a document is read once and never fully materialised as a tree.
+quick-xml = "0.42"
+
+blake3 = "1.8"
+humansize = "2.1"
+dirs = "7"
+pulldown-cmark = { version = "0.13.4", default-features = false }
+
+[dev-dependencies]
+# Fixtures are generated rather than committed — see `tests/previews.rs`. These
+# are the encoders that build them, and they are the same libraries the
+# previewers read through, which is the point: a fixture written by a different
+# implementation would test interop rather than the decode path.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
+tar = "0.4"
+flate2 = "1"

@@ -1,0 +1,26 @@
+[Desktop Entry]
+Type=Application
+Name=Peek
+GenericName=File Previewer
+Comment=Preview files without opening them
+Exec=peek %U
+Icon=dev.entro314labs.Peek
+Terminal=false
+Categories=Utility;Viewer;
+Keywords=preview;quicklook;quick look;view;peek;
+StartupNotify=false
+# Not shown in the applications menu: `peek` with no file is a daemon waiting
+# for a file manager, not something to launch and look at. It exists in the
+# "Open With" list, which is how COSMIC reaches it.
+NoDisplay=true
+
+# Every type with a previewer, so "Open With → Peek" appears on the files it can
+# actually show. Listing `application/octet-stream` as well is deliberate: the
+# metadata card is a real preview for an unrecognised file, and it is the one
+# case where nothing else in the list is any use either.
+
+# One line, and it has to be. The Desktop Entry spec has no line continuation:
+# a trailing backslash is part of the value, and `desktop-file-validate` rejects
+# every wrapped line as a malformed entry. Split across lines this list parses as
+# a single invalid MIME type, and "Open With -> Peek" appears on nothing.
+MimeType=inode/directory;application/octet-stream;application/pdf;image/png;image/jpeg;image/gif;image/webp;image/avif;image/tiff;image/bmp;image/x-icon;image/vnd.microsoft.icon;image/x-tga;image/x-portable-pixmap;image/x-portable-bitmap;image/x-portable-graymap;image/vnd.radiance;image/x-exr;image/qoi;image/svg+xml;image/svg+xml-compressed;text/plain;text/markdown;text/csv;text/html;text/xml;text/x-csrc;text/x-chdr;text/x-c++src;text/x-python;text/x-rust;text/x-go;text/x-java;text/x-shellscript;text/x-lua;text/x-ruby;text/x-perl;text/x-sql;text/x-diff;text/x-patch;text/css;application/json;application/xml;application/javascript;application/toml;application/yaml;application/x-yaml;application/x-desktop;application/sql;application/zip;application/x-7z-compressed;application/x-tar;application/gzip;application/x-compressed-tar;application/x-bzip2-compressed-tar;application/x-xz-compressed-tar;application/x-zstd-compressed-tar;application/zstd;application/java-archive;application/vnd.android.package-archive;video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mpeg;video/ogg;video/x-flv;video/3gpp;audio/mpeg;audio/flac;audio/ogg;audio/x-vorbis+ogg;audio/opus;audio/x-wav;audio/mp4;audio/aac;audio/x-m4a;audio/x-aiff;audio/midi;

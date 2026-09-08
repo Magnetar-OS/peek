@@ -1,0 +1,21 @@
+[package]
+name = "peek-thumbnailer"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Freedesktop thumbnailer backed by peek's preview engine"
+# Not published: a thumbnailer is only useful once its `.thumbnailer` file is
+# installed where the thumbnail factories look, which `cargo install` cannot do.
+# It ships in the distribution packages alongside the app, which can.
+publish = false
+
+[dependencies]
+peek-engine = { path = "../peek-engine" }
+
+# Only the PNG encoder: the thumbnail cache format is PNG and nothing else.
+# Decoding is peek-engine's job, with its full codec set.
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+url = "2"

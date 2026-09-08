@@ -1,0 +1,56 @@
+# The boring workflow: fmt, clippy at the pedantic level the justfile already
+# demands, the full test suite, and the metadata validators — on every push.
+# The release pipeline (release.yml) trusts this one to have already said no.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # What the engine links: poppler for PDF, GStreamer for media, and the
+      # desktop libraries libcosmic's stack compiles against. The validators
+      # come along for `just validate`.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            just pkg-config libpoppler-glib-dev libcairo2-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libxkbcommon-dev libwayland-dev libinput-dev libudev-dev \
+            desktop-file-utils appstream shared-mime-info
+
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: just check --workspace --all-targets
+
+      - name: Tests
+        run: just test
+
+      # The engine's C-library features exist so a consumer can build it without
+      # poppler or GStreamer. An untested feature combination rots, and this one
+      # rots silently — the default build keeps working while the cut-down build
+      # stops compiling. This is the only combination worth a job: the features
+      # are independent, and `--all-features` is what `just check` already runs.
+      - name: Engine builds without its C libraries
+        run: cargo check -p peek-engine --no-default-features --all-targets --locked
+
+      - name: Desktop metadata
+        run: just validate

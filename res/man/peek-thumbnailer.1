@@ -1,0 +1,44 @@
+.\" Copyright 2026 entro314-labs
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.TH PEEK-THUMBNAILER 1 "2026-09-07" "peek" "User Commands"
+.SH NAME
+peek-thumbnailer \- generate file manager thumbnails with peek's decoders
+.SH SYNOPSIS
+.B peek-thumbnailer
+.I INPUT
+.I OUTPUT.png
+.I SIZE
+.SH DESCRIPTION
+.B peek-thumbnailer
+implements the freedesktop thumbnailer contract using the same decoders
+.BR peek (1)
+previews files with, so the icon in the file manager and the preview over it
+cannot disagree about what a file looks like.
+.PP
+It is not normally run by hand. A
+.I .thumbnailer
+entry in
+.I /usr/share/thumbnailers/
+registers it, and the file manager's thumbnail factory invokes it, substituting
+the input path, an output path, and the size.
+.PP
+.I INPUT
+may be a path or a
+.I file://
+URI.
+.I SIZE
+is the longest edge in pixels.
+.PP
+Files whose best representation is not a picture \(em text, archives,
+directories \(em exit non-zero without writing anything. That is the
+contract's way of saying the file manager's own type icon is the better
+answer, and is not an error.
+.SH EXIT STATUS
+.TP
+.B 0
+A thumbnail was written.
+.TP
+.B 1
+No thumbnail applies, or the file could not be read or decoded.
+.SH SEE ALSO
+.BR peek (1)
