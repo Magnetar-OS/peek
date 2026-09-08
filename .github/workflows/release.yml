@@ -76,7 +76,7 @@ jobs:
       pkgname: 'peek-bin'
       product_name: 'peek'
       pkgdesc: 'Preview files without opening them'
-      url: 'https://github.com/entro314-labs/peek'
+      url: 'https://github.com/Magnetar-OS/peek'
       license: 'GPL-3.0-or-later'
       depends: 'libxkbcommon'
       provides: 'peek'

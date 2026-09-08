@@ -7,7 +7,7 @@ edition = "2024"
 # Matches libcosmic and the COSMIC applications, rather than whatever toolchain
 # happened to be installed when this was written.
 rust-version = "1.93"
-repository = "https://github.com/entro314-labs/peek"
+repository = "https://github.com/Magnetar-OS/peek"
 # Poppler, the only PDF renderer actually shipped on a Linux desktop, is GPL.
 # That decides the licence for the whole workspace including the engine crate —
 # unlike `light`, where the engine could stay MPL-2.0 because nothing it linked

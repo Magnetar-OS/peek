@@ -2,7 +2,7 @@
 
 Type detection and preview rendering, with no UI dependencies.
 
-This is the engine behind [`peek`](https://github.com/entro314-labs/peek), a
+This is the engine behind [`peek`](https://github.com/Magnetar-OS/peek), a
 QuickLook-class file previewer for the COSMIC desktop. Everything a previewer
 frontend needs that is not drawing: deciding what a file is, turning it into
 pixels or lines or a listing, and describing it when none of those apply.

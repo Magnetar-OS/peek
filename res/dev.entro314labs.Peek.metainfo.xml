@@ -38,9 +38,9 @@
     <name>entro314 labs</name>
   </developer>
 
-  <url type="homepage">https://github.com/entro314-labs/peek</url>
-  <url type="bugtracker">https://github.com/entro314-labs/peek/issues</url>
-  <url type="vcs-browser">https://github.com/entro314-labs/peek</url>
+  <url type="homepage">https://github.com/Magnetar-OS/peek</url>
+  <url type="bugtracker">https://github.com/Magnetar-OS/peek/issues</url>
+  <url type="vcs-browser">https://github.com/Magnetar-OS/peek</url>
 
   <launchable type="desktop-id">dev.entro314labs.Peek.desktop</launchable>
 

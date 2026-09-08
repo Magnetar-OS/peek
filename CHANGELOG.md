@@ -79,4 +79,4 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
-[0.1.0]: https://github.com/entro314-labs/peek/releases/tag/v0.1.0
+[0.1.0]: https://github.com/Magnetar-OS/peek/releases/tag/v0.1.0
