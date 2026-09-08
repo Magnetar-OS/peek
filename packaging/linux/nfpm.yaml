@@ -21,20 +21,49 @@ license: GPL-3.0-or-later
 description: |
   Preview files without opening them
 
-# Runtime dependencies, per distro. PROVISIONAL — derived from the -sys
-# crates in Cargo.lock; after the first CI build, trim against
-# `ldd target/release/peek`. The arch names are validated for real by
-# arch-repo.yml's container install test.
+# Runtime dependencies, per distro. Taken from `ldd` on both release
+# binaries, not from the -sys crates: the previous list named only
+# libxkbcommon, and a package that declares one of its eighty-eight shared
+# libraries installs cleanly and then fails to start on
+# `libpoppler-glib.so.8: cannot open shared object file`.
+#
+# `peek` and `peek-thumbnailer` need the same set, so one list covers both.
+# Transitive libraries are left out — poppler-glib pulls libpoppler, and
+# gst-plugins-base pulls the codec libraries — as are zlib, zstd and
+# systemd-libs, which are base-system everywhere this ships.
+#
+# The Debian entries carry alternatives because Ubuntu 24.04's 64-bit time_t
+# transition renamed these packages: 24.04 has the `t64` name, Debian 12 and
+# Ubuntu 22.04 have the plain one, and a single package has to install on
+# both. The Arch names are checked against a live Arch system and are
+# validated again by arch-repo.yml's container install test; the deb and rpm
+# names are derived from each distro's own SONAME-to-package mapping and are
+# not install-tested by the pipeline.
 overrides:
   deb:
     depends:
       - libxkbcommon0
+      - libpoppler-glib8t64 | libpoppler-glib8
+      - libcairo2
+      - libglib2.0-0t64 | libglib2.0-0
+      - libgstreamer1.0-0t64 | libgstreamer1.0-0
+      - libgstreamer-plugins-base1.0-0t64 | libgstreamer-plugins-base1.0-0
   rpm:
     depends:
       - libxkbcommon
+      - poppler-glib
+      - cairo
+      - glib2
+      - gstreamer1
+      - gstreamer1-plugins-base
   archlinux:
     depends:
       - libxkbcommon
+      - poppler-glib
+      - cairo
+      - glib2
+      - gstreamer
+      - gst-plugins-base-libs
 
 contents:
   # Everything `just rootdir=.release-kit/pkgroot install` staged: binaries,
