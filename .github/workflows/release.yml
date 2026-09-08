@@ -41,9 +41,15 @@ jobs:
       # The justfile is the single source of truth for the installed layout:
       # build natively (the legs run on their own architecture), then stage
       # the full install tree for nfpm's tree entry to package.
+      #
+      # `just build-release` rather than a bare `cargo build --release`: the
+      # recipe passes `--workspace`, and `install` copies two binaries. A
+      # plain `cargo build` builds only the root package, so the leg compiled
+      # for twelve minutes and then died on `install: cannot stat
+      # 'target/release/peek-thumbnailer'`.
       build_command: |
         command -v just >/dev/null || { curl --proto '=https' --tlsv1.2 -sSfL https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin; }
-        cargo build --release --locked
+        just build-release
         just rootdir="$PWD/.release-kit/pkgroot" install
       binary_path: 'target/release/$RK_BINARY'
       # Everything the build links, which is what ci.yml installs minus the
