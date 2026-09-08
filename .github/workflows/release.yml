@@ -51,8 +51,13 @@ jobs:
       # runs a clippy gate before the build, and poppler, cairo and GStreamer
       # are all resolved through pkg-config at that point, so the leg died in
       # `gstreamer-sys`'s build script long before any lint ran.
+      # `libunwind-dev` is named explicitly even though libgstreamer1.0-dev
+      # depends on it: the ubuntu-22.04 runner image ships LLVM's
+      # `libunwind-14-dev`, which conflicts with it rather than satisfying it,
+      # and apt reports that as "held broken packages" against gstreamer
+      # instead of against the thing actually in the way.
       apt_packages: >-
-        pkg-config
+        pkg-config libunwind-dev
         libpoppler-glib-dev libcairo2-dev
         libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
         libxkbcommon-dev libwayland-dev libinput-dev libudev-dev
