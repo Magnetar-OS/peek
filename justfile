@@ -1,7 +1,7 @@
 # Name of the application's binary.
 name := 'peek'
 # The unique ID of the application.
-appid := 'dev.entro314labs.Peek'
+appid := 'com.magnetaros.Peek'
 
 # Path to root file system, which defaults to `/`.
 rootdir := ''
@@ -100,8 +100,8 @@ install:
     install -Dm0644 res/man/peek.1 {{man-dst}}/peek.1
     install -Dm0644 res/man/peek-thumbnailer.1 {{man-dst}}/peek-thumbnailer.1
     install -Dm0644 res/plugins/README.md {{plugins-dst}}/README.md
-    install -Dm0644 res/plugins/dev.entro314labs.Peek.example-command.toml {{plugins-dst}}/dev.entro314labs.Peek.example-command.toml.example
-    install -Dm0644 res/plugins/dev.entro314labs.Peek.example-text.toml {{plugins-dst}}/dev.entro314labs.Peek.example-text.toml.example
+    install -Dm0644 res/plugins/com.magnetaros.Peek.example-command.toml {{plugins-dst}}/com.magnetaros.Peek.example-command.toml.example
+    install -Dm0644 res/plugins/com.magnetaros.Peek.example-text.toml {{plugins-dst}}/com.magnetaros.Peek.example-text.toml.example
     # `Open With → Peek` reads the MIME list out of the desktop database, which
     # is a cache and does not notice a new file on its own. Guarded on rootdir:
     # unguarded, the tools create cache files inside a staged package root and

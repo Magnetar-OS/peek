@@ -4,7 +4,7 @@
 //! Persisted settings, stored through `cosmic-config`.
 //!
 //! The same store every COSMIC application uses, under
-//! `~/.config/cosmic/dev.entro314labs.Peek/v1/`, one RON file per key. Changes
+//! `~/.config/cosmic/com.magnetaros.Peek/v1/`, one RON file per key. Changes
 //! arrive over a subscription and are applied without a restart, which matters
 //! for a process that stays resident for the whole session.
 

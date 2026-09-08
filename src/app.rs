@@ -50,7 +50,7 @@ use crate::surface;
 use crate::view;
 
 /// Reverse-DNS identifier, used for the D-Bus name and the config store.
-pub const APP_ID: &str = "dev.entro314labs.Peek";
+pub const APP_ID: &str = "com.magnetaros.Peek";
 
 /// D-Bus action name a second invocation uses to hand its paths over.
 pub const SHOW_ACTION: &str = "show";

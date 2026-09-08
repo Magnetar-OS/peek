@@ -14,7 +14,7 @@
 #
 # Nothing here is write access: `peek` renders files and never modifies them,
 # which is the one property that makes read-only host access defensible.
-app-id: dev.entro314labs.Peek
+app-id: com.magnetaros.Peek
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
@@ -37,7 +37,7 @@ finish-args:
   - --filesystem=host:ro
   # The previewer interface the file manager calls, and the name peek owns.
   - --own-name=org.gnome.NautilusPreviewer
-  - --own-name=dev.entro314labs.Peek
+  - --own-name=com.magnetaros.Peek
   # Opening a file in its real application has to leave the sandbox.
   - --talk-name=org.freedesktop.portal.OpenURI
   # Settings live in cosmic-config, which is read through the session bus.
@@ -72,10 +72,10 @@ modules:
       - cargo --offline build --release --workspace
       - install -Dm0755 target/release/peek /app/bin/peek
       - install -Dm0755 target/release/peek-thumbnailer /app/bin/peek-thumbnailer
-      - install -Dm0644 res/dev.entro314labs.Peek.desktop /app/share/applications/dev.entro314labs.Peek.desktop
-      - install -Dm0644 res/dev.entro314labs.Peek.metainfo.xml /app/share/metainfo/dev.entro314labs.Peek.metainfo.xml
-      - install -Dm0644 res/dev.entro314labs.Peek.thumbnailer /app/share/thumbnailers/dev.entro314labs.Peek.thumbnailer
-      - install -Dm0644 res/icons/hicolor/scalable/apps/dev.entro314labs.Peek.svg /app/share/icons/hicolor/scalable/apps/dev.entro314labs.Peek.svg
+      - install -Dm0644 res/com.magnetaros.Peek.desktop /app/share/applications/com.magnetaros.Peek.desktop
+      - install -Dm0644 res/com.magnetaros.Peek.metainfo.xml /app/share/metainfo/com.magnetaros.Peek.metainfo.xml
+      - install -Dm0644 res/com.magnetaros.Peek.thumbnailer /app/share/thumbnailers/com.magnetaros.Peek.thumbnailer
+      - install -Dm0644 res/icons/hicolor/scalable/apps/com.magnetaros.Peek.svg /app/share/icons/hicolor/scalable/apps/com.magnetaros.Peek.svg
       - install -Dm0644 res/plugins/README.md /app/share/peek/plugins/README.md
     sources:
       - type: dir

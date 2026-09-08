@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>dev.entro314labs.Peek</id>
+  <id>com.magnetaros.Peek</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>Peek</name>
@@ -34,7 +34,7 @@
     </p>
   </description>
 
-  <developer id="dev.entro314labs">
+  <developer id="com.magnetaros">
     <name>entro314 labs</name>
   </developer>
 
@@ -42,7 +42,7 @@
   <url type="bugtracker">https://github.com/Magnetar-OS/peek/issues</url>
   <url type="vcs-browser">https://github.com/Magnetar-OS/peek</url>
 
-  <launchable type="desktop-id">dev.entro314labs.Peek.desktop</launchable>
+  <launchable type="desktop-id">com.magnetaros.Peek.desktop</launchable>
 
   <provides>
     <binary>peek</binary>

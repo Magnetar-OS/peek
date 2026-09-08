@@ -230,12 +230,12 @@ is why `peek` with no arguments stays running instead of exiting.
 
 The gear in the overlay's header opens a settings panel; everything below can
 also be set from the command line. Settings live in `cosmic-config` under
-`~/.config/cosmic/dev.entro314labs.Peek/v1/`, one RON file per key, applied live
+`~/.config/cosmic/com.magnetaros.Peek/v1/`, one RON file per key, applied live
 either way.
 
 ```sh
-echo -n 'video-only' > ~/.config/cosmic/dev.entro314labs.Peek/v1/autoplay
-echo -n 'false' > ~/.config/cosmic/dev.entro314labs.Peek/v1/blur
+echo -n 'video-only' > ~/.config/cosmic/com.magnetaros.Peek/v1/autoplay
+echo -n 'false' > ~/.config/cosmic/com.magnetaros.Peek/v1/blur
 ```
 
 | Key | Default | Does |
