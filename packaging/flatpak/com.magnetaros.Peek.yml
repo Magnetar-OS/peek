@@ -76,6 +76,8 @@ modules:
       - install -Dm0644 res/com.magnetaros.Peek.metainfo.xml /app/share/metainfo/com.magnetaros.Peek.metainfo.xml
       - install -Dm0644 res/com.magnetaros.Peek.thumbnailer /app/share/thumbnailers/com.magnetaros.Peek.thumbnailer
       - install -Dm0644 res/icons/hicolor/scalable/apps/com.magnetaros.Peek.svg /app/share/icons/hicolor/scalable/apps/com.magnetaros.Peek.svg
+      - install -Dm0644 res/icons/hicolor/symbolic/apps/com.magnetaros.Peek-symbolic.svg /app/share/icons/hicolor/symbolic/apps/com.magnetaros.Peek-symbolic.svg
+      - for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do install -Dm0644 "res/icons/hicolor/$size/apps/com.magnetaros.Peek.png" "/app/share/icons/hicolor/$size/apps/com.magnetaros.Peek.png"; done
       - install -Dm0644 res/plugins/README.md /app/share/peek/plugins/README.md
     sources:
       - type: dir

@@ -14,8 +14,13 @@ cargo-target-dir := env('CARGO_TARGET_DIR', 'target')
 appdata := appid + '.metainfo.xml'
 # Application's desktop entry
 desktop := appid + '.desktop'
-# Application's icon.
+# Application's icon. The scalable SVG is what modern toolkits pick up; the
+# PNGs are rasterised from it at each size so the panel and the icon grid get
+# pixel-exact art instead of a downscaled smudge.
+icon-dir := 'res' / 'icons' / 'hicolor'
 icon-svg := appid + '.svg'
+icon-symbolic := appid + '-symbolic.svg'
+icon-sizes := '16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512'
 # The thumbnailer's registration with the thumbnail factories.
 thumbnailer-entry := appid + '.thumbnailer'
 
@@ -26,6 +31,7 @@ bin-dst := base-dir / 'bin' / name
 desktop-dst := base-dir / 'share' / 'applications' / desktop
 icons-dst := base-dir / 'share' / 'icons' / 'hicolor'
 icon-svg-dst := icons-dst / 'scalable' / 'apps' / icon-svg
+icon-symbolic-dst := icons-dst / 'symbolic' / 'apps' / icon-symbolic
 thumbnailer-bin-dst := base-dir / 'bin' / 'peek-thumbnailer'
 thumbnailer-entry-dst := base-dir / 'share' / 'thumbnailers' / thumbnailer-entry
 plugins-dst := base-dir / 'share' / 'peek' / 'plugins'
@@ -92,7 +98,12 @@ install:
     install -Dm0644 res/{{desktop}} {{desktop-dst}}
     install -Dm0644 res/{{appdata}} {{appdata-dst}}
     install -Dm0644 res/{{thumbnailer-entry}} {{thumbnailer-entry-dst}}
-    install -Dm0644 res/icons/hicolor/scalable/apps/{{icon-svg}} {{icon-svg-dst}}
+    install -Dm0644 {{icon-dir}}/scalable/apps/{{icon-svg}} {{icon-svg-dst}}
+    install -Dm0644 {{icon-dir}}/symbolic/apps/{{icon-symbolic}} {{icon-symbolic-dst}}
+    for size in {{icon-sizes}}; do \
+        install -Dm0644 {{icon-dir}}/$size/apps/{{appid}}.png \
+            {{icons-dst}}/$size/apps/{{appid}}.png; \
+    done
     # The directory the plugin loader reads, plus the worked examples. The
     # examples are documentation, not enabled previewers: they are named
     # `.example-*` and the loader only reads `.toml`.
@@ -113,7 +124,10 @@ install:
 
 # Uninstalls installed files
 uninstall:
-    rm -f {{bin-dst}} {{thumbnailer-bin-dst}} {{desktop-dst}} {{appdata-dst}} {{thumbnailer-entry-dst}} {{icon-svg-dst}}
+    rm -f {{bin-dst}} {{thumbnailer-bin-dst}} {{desktop-dst}} {{appdata-dst}} {{thumbnailer-entry-dst}} {{icon-svg-dst}} {{icon-symbolic-dst}}
+    for size in {{icon-sizes}}; do \
+        rm -f {{icons-dst}}/$size/apps/{{appid}}.png; \
+    done
     rm -rf {{plugins-dst}}
     rm -f {{man-dst}}/peek.1 {{man-dst}}/peek-thumbnailer.1
     -update-desktop-database {{base-dir}}/share/applications
