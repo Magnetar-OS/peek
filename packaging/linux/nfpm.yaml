@@ -51,6 +51,7 @@ overrides:
       - libglib2.0-0t64 | libglib2.0-0
       - libgstreamer1.0-0
       - libgstreamer-plugins-base1.0-0
+      - liblzma5
   rpm:
     depends:
       - libxkbcommon
@@ -59,6 +60,7 @@ overrides:
       - glib2
       - gstreamer1
       - gstreamer1-plugins-base
+      - xz-libs
   archlinux:
     depends:
       - libxkbcommon
@@ -67,6 +69,7 @@ overrides:
       - glib2
       - gstreamer
       - gst-plugins-base-libs
+      - xz
 
 contents:
   # Everything `just rootdir=.release-kit/pkgroot install` staged: binaries,
