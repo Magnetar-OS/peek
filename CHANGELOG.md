@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The package declares `xz`, which the binaries link directly. It was
+  already present on any Arch system, so nothing failed to start.
+
 ## [1.0.1] - 2026-09-16
 
 ### Fixed
