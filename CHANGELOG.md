@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-16
+
 ### Fixed
 
 - The Arch package is valid. The v1.0.0 pacman package carried a tar entry
@@ -87,4 +89,6 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
+[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Magnetar-OS/peek/compare/v0.1.0...v1.0.1
 [0.1.0]: https://github.com/Magnetar-OS/peek/releases/tag/v0.1.0
