@@ -7,7 +7,10 @@
 # The RK_* variables are exported by the release workflow; nfpm expands
 # ${VAR} itself. You never edit the version here.
 
-name: peek
+# Not `peek`: every major distribution ships an unrelated `peek` (a GIF
+# recorder, 1.5.x) under that name, with /usr/bin/peek. Sharing the name made
+# `pacman -S peek` install the other program and `-Syu` swap this one out.
+name: magnetar-peek
 arch: ${RK_DEB_ARCH}
 platform: linux
 version: ${RK_VERSION}
@@ -27,7 +30,7 @@ description: |
 # libraries installs cleanly and then fails to start on
 # `libpoppler-glib.so.8: cannot open shared object file`.
 #
-# `peek` and `peek-thumbnailer` need the same set, so one list covers both.
+# `magnetar-peek` and `peek-thumbnailer` need the same set, so one list covers both.
 # Transitive libraries are left out — poppler-glib pulls libpoppler, and
 # gst-plugins-base pulls the codec libraries — as are zlib, zstd and
 # systemd-libs, which are base-system everywhere this ships.
@@ -42,8 +45,15 @@ description: |
 # validated again by arch-repo.yml's container install test; the deb and rpm
 # names are derived from each distro's own SONAME-to-package mapping and are
 # not install-tested by the pipeline.
+# Migration from this project's own `peek` package (1.0.1 and earlier). The
+# version bound is what keeps it from touching the GIF recorder, which is 1.5.x
+# everywhere: an unversioned `replaces: peek` would uninstall it on -Syu.
 overrides:
   deb:
+    replaces:
+      - peek (<= 1.0.1)
+    conflicts:
+      - peek (<= 1.0.1)
     depends:
       - libxkbcommon0
       - libpoppler-glib8t64 | libpoppler-glib8
@@ -53,6 +63,10 @@ overrides:
       - libgstreamer-plugins-base1.0-0
       - liblzma5
   rpm:
+    replaces:
+      - peek <= 1.0.1
+    conflicts:
+      - peek <= 1.0.1
     depends:
       - libxkbcommon
       - poppler-glib
@@ -62,6 +76,10 @@ overrides:
       - gstreamer1-plugins-base
       - xz-libs
   archlinux:
+    replaces:
+      - peek<=1.0.1
+    conflicts:
+      - peek<=1.0.1
     depends:
       - libxkbcommon
       - poppler-glib

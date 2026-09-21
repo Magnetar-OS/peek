@@ -129,24 +129,28 @@ Requires poppler-glib, GStreamer with the plugin sets you want to decode, and a
 
 ## Use
 
+The command is `magnetar-peek`. `peek` is taken: Arch, Debian and Fedora all
+ship an unrelated `peek` (a GIF recorder) under that package and command name,
+and the two install side by side.
+
 ```sh
-peek photo.jpg          # preview it; arrows walk the rest of the directory
-peek *.png              # preview the set; arrows walk exactly these
-peek                    # toggle the last preview
+magnetar-peek photo.jpg # preview it; arrows walk the rest of the directory
+magnetar-peek *.png     # preview the set; arrows walk exactly these
+magnetar-peek           # toggle the last preview
 ```
 
 The first invocation becomes the daemon and stays resident. A second invocation
-reaches it over D-Bus, which is what makes `peek` itself the right thing to bind
+reaches it over D-Bus, which is what makes `magnetar-peek` itself the right thing to bind
 to a shortcut:
 
 **Settings → Desktop → Keyboard → Keyboard Shortcuts → Custom Shortcuts**, with
-the command `peek` (absolute path until it is on `$PATH`).
+the command `magnetar-peek`.
 
 `just bench` times the path between pressing space and seeing the file, per
-previewer; `man peek` documents the rest.
+previewer; `man magnetar-peek` documents the rest.
 
 `RUST_LOG=peek=debug` for logs. They go to the journal — `journalctl --user -t
-peek -f` — and to stderr only when there is no journal to write to, because a
+magnetar-peek -f` — and to stderr only when there is no journal to write to, because a
 daemon started by D-Bus activation has a stderr nobody can see.
 
 ### Keys

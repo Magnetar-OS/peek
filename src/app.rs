@@ -11,13 +11,13 @@
 //!
 //! ## Four ways in
 //!
-//! * `peek <paths…>` on the command line, which becomes a D-Bus activation when
+//! * `magnetar-peek <paths…>` on the command line, which becomes a D-Bus activation when
 //!   the daemon is already up.
 //! * `org.gnome.NautilusPreviewer2`, which is the space bar in Nautilus. See
 //!   [`crate::previewer`].
 //! * "Open With → Peek" from any file manager, including cosmic-files, via the
 //!   desktop entry.
-//! * `peek` with no arguments, which toggles whatever was last shown.
+//! * `magnetar-peek` with no arguments, which toggles whatever was last shown.
 //!
 //! All four converge on [`Message::Show`], so there is one code path that
 //! decides what to preview.

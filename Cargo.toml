@@ -37,6 +37,13 @@ readme = "README.md"
 # half that is publishable, and it is published.
 publish = false
 
+# The command is `magnetar-peek`, not `peek`: Arch, Debian and Fedora all ship
+# an unrelated `peek` (a GIF recorder) that owns /usr/bin/peek and the package
+# name. The crate keeps its name, so `RUST_LOG=peek=debug` still works.
+[[bin]]
+name = "magnetar-peek"
+path = "src/main.rs"
+
 [dependencies]
 peek-engine = { path = "crates/peek-engine" }
 

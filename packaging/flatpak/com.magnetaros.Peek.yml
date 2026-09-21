@@ -20,7 +20,7 @@ runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
-command: peek
+command: magnetar-peek
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
@@ -70,7 +70,7 @@ modules:
     build-commands:
       - cargo --offline fetch --manifest-path Cargo.toml --verbose
       - cargo --offline build --release --workspace
-      - install -Dm0755 target/release/peek /app/bin/peek
+      - install -Dm0755 target/release/magnetar-peek /app/bin/magnetar-peek
       - install -Dm0755 target/release/peek-thumbnailer /app/bin/peek-thumbnailer
       - install -Dm0644 res/com.magnetaros.Peek.desktop /app/share/applications/com.magnetaros.Peek.desktop
       - install -Dm0644 res/com.magnetaros.Peek.metainfo.xml /app/share/metainfo/com.magnetaros.Peek.metainfo.xml

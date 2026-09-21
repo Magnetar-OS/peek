@@ -1,13 +1,13 @@
 .\" Copyright 2026 entro314-labs
 .\" SPDX-License-Identifier: GPL-3.0-or-later
-.TH PEEK 1 "2026-09-07" "peek" "User Commands"
+.TH MAGNETAR-PEEK 1 "2026-09-07" "peek" "User Commands"
 .SH NAME
-peek \- preview files without opening them
+magnetar-peek \- preview files without opening them
 .SH SYNOPSIS
-.B peek
+.B magnetar-peek
 .RI [ FILE .\|.\|.]
 .SH DESCRIPTION
-.B peek
+.B magnetar-peek
 is a QuickLook-class file previewer for the COSMIC desktop. Pointed at a file,
 it shows the file \(em the picture, the pages, the video, the source with its
 syntax coloured, the contents of the archive \(em without opening an
@@ -20,11 +20,11 @@ at startup rather than once per keypress, and the daemon is what keeps the
 previewer service on the bus for a file manager to find.
 .PP
 With no arguments,
-.B peek
+.B magnetar-peek
 toggles the last preview, which is what makes the command itself the right
 thing to bind to a keyboard shortcut.
 .SH OPTIONS
-.B peek
+.B magnetar-peek
 takes file paths and no flags. Everything else is a setting; see
 .B CONFIGURATION .
 .SH KEYS
@@ -89,7 +89,7 @@ An unset key uses its default; an unreadable one is logged and falls back, so a
 bad value cannot stop a preview opening.
 .SH PLUGINS
 File types
-.B peek
+.B magnetar-peek
 does not handle can be added with a TOML file in
 .IR ~/.local/share/peek/plugins/ ,
 either by routing the type to a previewer that already exists or by naming a
@@ -101,14 +101,14 @@ in
 .I /usr/share/peek/plugins/
 for the format.
 .SH THE SPACE BAR
-.B peek
+.B magnetar-peek
 serves
 .BR org.gnome.NautilusPreviewer2 ,
 which is the interface a file manager calls when the space bar is pressed, so
 in Nautilus the gesture works with no further setup. GNOME's own previewer,
 .BR sushi ,
 claims the same bus name;
-.B peek
+.B magnetar-peek
 asks to replace it and hands it back on exit. To make the takeover survive a
 reboot:
 .PP
@@ -128,7 +128,7 @@ Plugin manifests.
 Log filter, e.g.
 .BR peek=debug .
 Logs go to the journal \(em
-.B journalctl --user -t peek -f
+.B journalctl --user -t magnetar-peek -f
 \(em and to stderr only when there is no journal to write to, because a daemon
 started by D-Bus activation has a stderr nobody can see.
 .TP

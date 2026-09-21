@@ -35,7 +35,7 @@ jobs:
       contents: write
     with:
       app_display_name: 'Peek'
-      product_name: 'peek'
+      product_name: 'magnetar-peek'
       tag: ${{ inputs.tag || '' }}
       build_targets: ${{ inputs.build_targets || '' }}
       # The justfile is the single source of truth for the installed layout:
@@ -89,7 +89,7 @@ jobs:
     uses: entro314-labs/linux-release-kit/.github/workflows/arch-repo.yml@main
     with:
       tag: ${{ inputs.tag || '' }}
-      product_name: 'peek'
+      product_name: 'magnetar-peek'
       repo_name: 'magnetar'
       pages_repo: 'Magnetar-OS/arch-repo'
     secrets:
@@ -107,14 +107,14 @@ jobs:
     uses: entro314-labs/linux-release-kit/.github/workflows/aur.yml@main
     with:
       tag: ${{ inputs.tag || '' }}
-      pkgname: 'peek-bin'
-      product_name: 'peek'
+      pkgname: 'magnetar-peek-bin'
+      product_name: 'magnetar-peek'
       pkgdesc: 'Preview files without opening them'
       url: 'https://github.com/Magnetar-OS/peek'
       license: 'GPL-3.0-or-later'
       depends: 'libxkbcommon poppler-glib cairo glib2 gstreamer gst-plugins-base-libs xz'
-      provides: 'peek'
-      conflicts: 'peek'
+      provides: 'magnetar-peek'
+      conflicts: 'magnetar-peek'
       maintainer: 'Dominikos Pritis <dominikos.pritis@gmail.com>'
     secrets:
       AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

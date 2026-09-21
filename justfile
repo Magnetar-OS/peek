@@ -1,5 +1,6 @@
-# Name of the application's binary.
-name := 'peek'
+# Name of the application's binary. Not `peek`: Arch, Debian and Fedora ship an
+# unrelated `peek` (a GIF recorder) that owns that command and package name.
+name := 'magnetar-peek'
 # The unique ID of the application.
 appid := 'com.magnetaros.Peek'
 
@@ -108,7 +109,7 @@ install:
     # examples are documentation, not enabled previewers: they are named
     # `.example-*` and the loader only reads `.toml`.
     install -d {{plugins-dst}}
-    install -Dm0644 res/man/peek.1 {{man-dst}}/peek.1
+    install -Dm0644 res/man/magnetar-peek.1 {{man-dst}}/magnetar-peek.1
     install -Dm0644 res/man/peek-thumbnailer.1 {{man-dst}}/peek-thumbnailer.1
     install -Dm0644 res/plugins/README.md {{plugins-dst}}/README.md
     install -Dm0644 res/plugins/com.magnetaros.Peek.example-command.toml {{plugins-dst}}/com.magnetaros.Peek.example-command.toml.example
@@ -129,7 +130,7 @@ uninstall:
         rm -f {{icons-dst}}/$size/apps/{{appid}}.png; \
     done
     rm -rf {{plugins-dst}}
-    rm -f {{man-dst}}/peek.1 {{man-dst}}/peek-thumbnailer.1
+    rm -f {{man-dst}}/magnetar-peek.1 {{man-dst}}/peek-thumbnailer.1
     -update-desktop-database {{base-dir}}/share/applications
 
 # Install to the current user rather than the system, for dogfooding.
