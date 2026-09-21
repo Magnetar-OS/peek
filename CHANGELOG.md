@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The command and the package are `magnetar-peek`.** Arch, Debian and Fedora
+  all ship an unrelated `peek` (a GIF recorder, 1.5.x) under that package and
+  command name. Sharing it meant `pacman -S peek` installed the other program,
+  `pacman -Syu` replaced this one with it, and the two could not be installed
+  together. The package replaces this project's own `peek` 1.0.1 and earlier
+  on upgrade and leaves the GIF recorder alone. A keyboard shortcut bound to
+  `peek` needs changing to `magnetar-peek`; logs are now under
+  `journalctl --user -t magnetar-peek`.
+
 ### Fixed
 
 - The package declares `xz`, which the binaries link directly. It was
