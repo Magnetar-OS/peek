@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-21
+
 ### Changed
 
 - **The command and the package are `magnetar-peek`.** Arch, Debian and Fedora
@@ -105,6 +107,7 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
-[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/Magnetar-OS/peek/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/Magnetar-OS/peek/compare/v0.1.0...v1.0.1
 [0.1.0]: https://github.com/Magnetar-OS/peek/releases/tag/v0.1.0
