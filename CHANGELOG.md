@@ -8,9 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [2.1.0] - 2026-09-22
 
-### Features
+### Changed
 
-- implement new feature for user authentication and improve error handling ([57cb6e4](https://github.com/Magnetar-OS/peek/commit/57cb6e4))
+- Rebuilt against the current COSMIC libraries (libcosmic `03c8f93`).
 
 ## [2.0.0] - 2026-09-21
 
