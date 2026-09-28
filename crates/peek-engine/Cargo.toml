@@ -84,7 +84,9 @@ flate2 = "1"
 bzip2 = "0.6"
 xz2 = "0.1"
 zstd = "0.14"
-sevenz-rust2 = "0.22.2"
+# Only the header reader: nothing here decompresses or writes a 7z, so the
+# encoder, AES, bzip2 and PPMd that the default features bring are unused.
+sevenz-rust2 = { version = "0.23", default-features = false }
 
 # Syntax highlighting for source files. `default-fancy` swaps oniguruma for
 # fancy-regex, keeping the build pure Rust.
@@ -125,3 +127,5 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 zip = { version = "8", default-features = false, features = ["deflate"] }
 tar = "0.4"
 flate2 = "1"
+# The 7z writer, for a fixture only; the library build reads headers alone.
+sevenz-rust2 = { version = "0.23", default-features = false, features = ["compress"] }

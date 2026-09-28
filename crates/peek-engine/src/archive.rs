@@ -312,6 +312,41 @@ mod tests {
     }
 
     #[test]
+    fn a_7z_lists_its_members() {
+        let path = std::env::temp_dir().join("peek-test-archive.7z");
+        {
+            let mut writer = sevenz_rust2::ArchiveWriter::create(&path).expect("create");
+            writer
+                .push_archive_entry::<&[u8]>(
+                    sevenz_rust2::ArchiveEntry::new_directory("docs"),
+                    None,
+                )
+                .expect("directory");
+            writer
+                .push_archive_entry(
+                    sevenz_rust2::ArchiveEntry::new_file("docs/readme.txt"),
+                    Some(&b"seven bytes"[..7]),
+                )
+                .expect("file");
+            writer.finish().expect("finish");
+        }
+
+        let archive = list(&path, "application/x-7z-compressed").expect("lists");
+        assert_eq!(archive.format, "7z");
+        assert_eq!(archive.members.len(), 2);
+        let file = archive
+            .members
+            .iter()
+            .find(|member| member.name == "docs/readme.txt")
+            .expect("the file is listed");
+        assert_eq!(file.size, 7);
+        assert!(!file.is_dir);
+        assert!(archive.members.iter().any(|member| member.is_dir));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn zip_family_names_are_distinguished() {
         assert_eq!(label("application/java-archive"), "Java archive");
         assert_eq!(label("application/zip"), "Zip");
