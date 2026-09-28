@@ -43,6 +43,10 @@ All notable changes to this project are documented here. The format follows
   four can now be claimed by a plugin.
 - `.tar.lzma` archives are listed. They are LZMA-alone streams, not xz, and
   were handed to the xz decoder, which rejects them.
+- Comic pages are rendered again at full resolution when the overlay learns
+  the display's scale factor or size, instead of staying at the 1× size on a
+  HiDPI display. Photos are no longer decoded a second time when that
+  happens, which also stopped animated images restarting.
 
 ## [2.1.0] - 2026-09-22
 

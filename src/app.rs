@@ -1108,6 +1108,21 @@ async fn run_bounded<T: Send + 'static>(
     )
 }
 
+/// Whether a preview was rasterised for the display, and so has to be
+/// produced again when the output's size or scale factor changes.
+///
+/// Vectors, PDF pages and comic pages are rendered to a target derived from
+/// both. A raster photo is decoded at its own size whatever the display, so
+/// re-decoding it would cost a full decode — and restart an animation — for
+/// the same pixels.
+fn rendered_for_display(preview: &Preview) -> bool {
+    match preview {
+        Preview::Picture(picture) => picture.scalable,
+        Preview::Pdf(_) | Preview::Comic(_) => true,
+        _ => false,
+    }
+}
+
 /// Number of pages a preview has, for bounding page navigation.
 fn page_count(preview: &Preview) -> usize {
     match preview {
@@ -1657,7 +1672,7 @@ impl cosmic::Application for App {
                 // Rasterised-for-a-size previews were produced against the old
                 // factor and are now the wrong resolution; everything else is
                 // resolution-independent or already at its natural size.
-                if matches!(self.preview, Preview::Picture(_) | Preview::Pdf(_)) {
+                if rendered_for_display(&self.preview) {
                     return self.reload();
                 }
 
@@ -1701,10 +1716,9 @@ impl cosmic::Application for App {
                     return Task::batch([self.reload(), self.refresh_blur(), scale]);
                 }
 
-                // An SVG is rendered for a specific size, so a display change
-                // means it has to be rendered again — this is the one preview
-                // that is not resolution-independent once it has been produced.
-                if resized && matches!(self.preview, Preview::Picture(_)) {
+                // Vectors and pages are rendered for a specific size, so a
+                // display change means they have to be rendered again.
+                if resized && rendered_for_display(&self.preview) {
                     return Task::batch([self.reload(), self.refresh_blur(), scale]);
                 }
 
@@ -2107,6 +2121,36 @@ mod tests {
         let flags = Flags::new(vec!["/tmp/a.png".to_owned()]);
         assert_eq!(flags.action().map(String::as_str), Some(SHOW_ACTION));
         assert_eq!(flags.args(), vec!["/tmp/a.png"]);
+    }
+
+    #[test]
+    fn only_previews_rendered_for_the_display_are_rendered_again() {
+        let raster = || peek_engine::Raster::new(1, 1, vec![0; 4]).expect("a pixel");
+        let picture = |scalable| {
+            Preview::Picture(Box::new(peek_engine::Picture {
+                raster: raster(),
+                source_width: 1,
+                source_height: 1,
+                exif: Vec::new(),
+                scalable,
+                animation: None,
+            }))
+        };
+
+        assert!(rendered_for_display(&picture(true)), "an SVG");
+        assert!(
+            rendered_for_display(&Preview::Comic(Box::new(peek_engine::Comic {
+                raster: raster(),
+                page: 0,
+                pages: 3,
+            }))),
+            "a comic page is rasterised for the panel"
+        );
+        assert!(
+            !rendered_for_display(&picture(false)),
+            "a photo decodes to the same pixels at any scale"
+        );
+        assert!(!rendered_for_display(&Preview::Text(Box::default())));
     }
 
     #[test]
