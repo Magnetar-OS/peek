@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A comic book (CBZ) whose page claims to be small but inflates to gigabytes
+  is refused instead of being read into memory. Before, such a file could
+  exhaust memory in the previewer or in `peek-thumbnailer` when a file manager
+  thumbnailed its folder.
+
 ## [2.1.0] - 2026-09-22
 
 ### Changed

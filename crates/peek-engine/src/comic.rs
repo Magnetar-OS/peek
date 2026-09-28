@@ -104,11 +104,23 @@ pub fn render(path: &Path, page: usize, target: u32) -> Result<Comic, Error> {
         return Err(Error::PageTooLarge { page, size });
     }
 
+    // The declared size is the archive's claim, not a bound: the decompressor
+    // does not stop there, and a member declaring a kilobyte can inflate to
+    // gigabytes. Reading one byte past the claim catches the lie without
+    // buffering what it was hiding.
     let mut bytes = Vec::with_capacity(size as usize);
-    entry.read_to_end(&mut bytes).map_err(|source| Error::Io {
-        path: path.display().to_string(),
-        source,
-    })?;
+    (&mut entry)
+        .take(size + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|source| Error::Io {
+            path: path.display().to_string(),
+            source,
+        })?;
+    if bytes.len() as u64 > size {
+        return Err(Error::Damaged(format!(
+            "page {page} holds more than the {size} bytes its header declares"
+        )));
+    }
 
     let decoded = image::load_from_memory(&bytes)?;
     let reduced = crate::picture::reduce(decoded, target.clamp(MIN_EDGE, MAX_EDGE));
@@ -228,6 +240,50 @@ mod tests {
         }
 
         assert!(matches!(render(&path, 0, 900), Err(Error::NoPages)));
+        let _ = std::fs::remove_file(path);
+    }
+
+    /// Rewrite the uncompressed size a zip's first member declares, in both
+    /// the local header and the central directory, leaving the data alone.
+    fn declare_size(bytes: &mut [u8], size: u32) {
+        let local = bytes
+            .windows(4)
+            .position(|window| window == b"PK\x03\x04")
+            .expect("a local header");
+        bytes[local + 22..local + 26].copy_from_slice(&size.to_le_bytes());
+        let central = bytes
+            .windows(4)
+            .position(|window| window == b"PK\x01\x02")
+            .expect("a central directory entry");
+        bytes[central + 24..central + 28].copy_from_slice(&size.to_le_bytes());
+    }
+
+    #[test]
+    fn a_page_larger_than_its_header_declares_is_refused() {
+        // A decompression bomb in miniature: the header claims sixteen bytes,
+        // the stream inflates to a mebibyte. The declared size is only a
+        // claim — reading must stop just past it rather than buffer whatever
+        // the decompressor produces.
+        let path = std::env::temp_dir().join("peek-test-comic-bomb.cbz");
+        {
+            let file = std::fs::File::create(&path).expect("create");
+            let mut writer = zip::ZipWriter::new(file);
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            writer.start_file("page1.png", options).expect("start");
+            writer.write_all(&vec![0u8; 1024 * 1024]).expect("write");
+            writer.finish().expect("finish");
+        }
+        let mut bytes = std::fs::read(&path).expect("read back");
+        declare_size(&mut bytes, 16);
+        std::fs::write(&path, bytes).expect("rewrite");
+
+        let result = render(&path, 0, 900);
+        assert!(
+            matches!(result, Err(Error::Damaged(_))),
+            "expected the lie to be caught, got {result:?}"
+        );
+
         let _ = std::fs::remove_file(path);
     }
 
