@@ -24,6 +24,9 @@ All notable changes to this project are documented here. The format follows
 - `nautilus_previewer = false` is honoured: Peek no longer takes
   `org.gnome.NautilusPreviewer` from GNOME's previewer when the setting is
   off, and turning it off while Peek is running gives the name back at once.
+- Arrowing onto a file that was deleted after it was selected stops the
+  previous file's audio or video and says the file no longer exists, under
+  its name, instead of showing an empty card while the old track plays on.
 
 ## [2.1.0] - 2026-09-22
 

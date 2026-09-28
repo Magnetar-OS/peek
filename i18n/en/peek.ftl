@@ -126,6 +126,7 @@ reason-encrypted = This file is encrypted and needs a password
 reason-too-large = The image is too large to preview
 reason-empty = There is nothing in this file to show
 reason-no-preview = The file carries no embedded preview
+reason-missing = This file no longer exists
 
 ## Metadata card rows
 

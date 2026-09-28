@@ -219,6 +219,7 @@ fn reason_text(reason: Reason) -> String {
         // usable streams, so it uses the same words.
         Reason::NoCodec => fl!("no-codec"),
         Reason::NoPreview => fl!("reason-no-preview"),
+        Reason::Missing => fl!("reason-missing"),
     }
 }
 
@@ -376,7 +377,19 @@ fn header<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
     } else {
         match frame.entry {
             Some(entry) => (entry.name.clone(), meta::icon_name(&entry.mime)),
-            None => (fl!("no-file"), "text-x-generic".to_owned()),
+            // A file that went away still has the name it was selected by,
+            // and that is what the user is looking for in the header.
+            None => (
+                frame
+                    .around
+                    .current()
+                    .and_then(|path| path.file_name())
+                    .map_or_else(
+                        || fl!("no-file"),
+                        |name| name.to_string_lossy().into_owned(),
+                    ),
+                "text-x-generic".to_owned(),
+            ),
         }
     };
 
@@ -1578,6 +1591,7 @@ mod tests {
             Reason::Empty,
             Reason::NoCodec,
             Reason::NoPreview,
+            Reason::Missing,
         ] {
             let text = reason_text(reason);
             // A missing catalogue entry renders as the message id, which is

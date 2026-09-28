@@ -90,6 +90,8 @@ pub enum Reason {
     NoCodec,
     /// The container carries no embedded preview to extract.
     NoPreview,
+    /// The file was deleted or moved after it was selected.
+    Missing,
 }
 
 impl Preview {
@@ -356,6 +358,21 @@ fn plugin_preview(entry: &Entry, options: Options, card: impl Fn() -> Box<Card>)
     }
 }
 
+/// The preview for a file that is no longer there.
+///
+/// A file can go away between being selected and being shown — a download
+/// finishing, a build directory being cleaned — often enough that it is a
+/// preview rather than an error. There is nothing left to stat, so the card
+/// says only where the file was.
+#[must_use]
+pub fn missing(path: &std::path::Path) -> Preview {
+    failed(
+        Reason::Missing,
+        format!("{} no longer exists", path.display()),
+        Box::new(crate::meta::missing_card(path)),
+    )
+}
+
 fn failed(reason: Reason, error: impl std::fmt::Display, card: Box<Card>) -> Preview {
     let detail = error.to_string();
     tracing::debug!(%detail, ?reason, "falling back to the metadata card");
@@ -513,6 +530,21 @@ mod tests {
             load(&entry, Options::default()),
             Preview::Directory(_)
         ));
+    }
+
+    #[test]
+    fn a_vanished_file_says_so_and_where_it_was() {
+        let path = std::path::Path::new("/tmp/peek-test-gone/report.pdf");
+        match missing(path) {
+            Preview::Failed { reason, card, .. } => {
+                assert_eq!(reason, Reason::Missing);
+                assert!(card.rows.contains(&(
+                    crate::meta::Field::Where,
+                    crate::meta::Value::Text("/tmp/peek-test-gone".to_owned())
+                )));
+            }
+            other => panic!("expected a card with a reason, got {other:?}"),
+        }
     }
 
     #[test]

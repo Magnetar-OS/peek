@@ -437,17 +437,6 @@ impl App {
         self.generation = self.generation.wrapping_add(1);
         let generation = self.generation;
 
-        let Some(entry) = Entry::load(&path) else {
-            // The file went away between being selected and being opened, which
-            // is common enough — a download finishing, a build directory being
-            // cleaned — that it is a preview rather than an error.
-            self.entry = None;
-            self.preview = Preview::Card(Box::default());
-            self.image = None;
-            self.animation = None;
-            return Task::none();
-        };
-
         // The held document belongs to the previous file once the path moves.
         if self
             .pdf_session
@@ -460,7 +449,22 @@ impl App {
         // Playback of the previous file stops here rather than when the next one
         // loads: the pipeline holds the audio device, and letting the outgoing
         // track keep playing over the incoming preview is the worst of both.
+        // Before anything about the next file is known — including whether it
+        // still exists — because none of that changes that the user left.
         self.player = None;
+        self.pending_frames = 0;
+
+        let Some(entry) = Entry::load(&path) else {
+            // The file went away between being selected and being opened, which
+            // is common enough — a download finishing, a build directory being
+            // cleaned — that it is a preview rather than an error.
+            self.entry = None;
+            self.preview = peek_engine::preview::missing(&path);
+            self.image = None;
+            self.animation = None;
+            return self.refresh_blur();
+        };
+
         self.entry = Some(entry.clone());
         self.page = self.page.min(page_count(&self.preview).saturating_sub(1));
 
@@ -1942,6 +1946,45 @@ mod tests {
     /// core, and settings that never touch the user's config store.
     fn app(config: Config) -> App {
         App::new(Core::default(), config)
+    }
+
+    #[test]
+    fn stepping_onto_a_vanished_file_leaves_the_previous_one_behind() {
+        let dir = std::env::temp_dir().join("peek-test-app-vanished");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create");
+        let shown = dir.join("a.pdf");
+        std::fs::write(&shown, b"%PDF-1.4").expect("write");
+        let gone = dir.join("b.txt");
+
+        let mut app = app(Config::default());
+        app.around = Neighbourhood::from_list(vec![shown.clone(), gone.clone()], 0);
+        app.pdf_session = Some((shown.clone(), peek_engine::pdf::Session::open(&shown)));
+        // What playback leaves behind: frames still wanted for the old file.
+        app.pending_frames = FRAMES_AFTER_SEEK;
+
+        let _ = app.update(Message::Step(1));
+
+        assert!(
+            app.pdf_session.is_none(),
+            "the previous file's document is released"
+        );
+        assert_eq!(app.pending_frames, 0, "nothing more is drawn for it");
+        assert!(app.player.is_none());
+        assert!(app.entry.is_none());
+        assert!(
+            matches!(
+                app.preview,
+                Preview::Failed {
+                    reason: peek_engine::preview::Reason::Missing,
+                    ..
+                }
+            ),
+            "the file is said to be gone, got {:?}",
+            app.preview
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]

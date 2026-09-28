@@ -131,20 +131,28 @@ pub fn card(entry: &Entry) -> Card {
         rows.push((Field::SymlinkTo, Value::Text(target.display().to_string())));
     }
 
-    rows.push((
-        Field::Where,
-        Value::Text(
-            entry
-                .path
-                .parent()
-                .map_or_else(|| "/".to_owned(), |parent| parent.display().to_string()),
-        ),
-    ));
+    rows.push((Field::Where, Value::Text(parent_of(&entry.path))));
 
     Card {
         rows,
         icon: icon_name(&entry.mime),
     }
+}
+
+/// The card for a file that no longer exists: where it was, and nothing that
+/// would need it to be there.
+#[must_use]
+pub fn missing_card(path: &Path) -> Card {
+    Card {
+        rows: vec![(Field::Where, Value::Text(parent_of(path)))],
+        icon: "text-x-generic".to_owned(),
+    }
+}
+
+/// The directory a path sits in, for the "where" row.
+fn parent_of(path: &Path) -> String {
+    path.parent()
+        .map_or_else(|| "/".to_owned(), |parent| parent.display().to_string())
 }
 
 /// Hash a file, for the card's checksum row.
