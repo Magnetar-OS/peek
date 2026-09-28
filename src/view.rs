@@ -1603,6 +1603,15 @@ mod tests {
     }
 
     #[test]
+    fn too_large_does_not_assume_the_file_is_an_image() {
+        crate::localize::localize();
+        // Fonts, camera raws and comic pages are refused as too large as
+        // well as images, so the words cannot name a kind of file.
+        let text = plain_text(reason_text(Reason::TooLarge)).to_lowercase();
+        assert!(!text.contains("image"), "got {text:?}");
+    }
+
+    #[test]
     fn every_field_has_a_label() {
         crate::localize::localize();
 

@@ -68,6 +68,8 @@ All notable changes to this project are documented here. The format follows
 - 8K video plays. Playback frames wider than 6400 pixels were dropped, so
   the panel stayed on the poster; frames now pass up to the GPU's 8192-pixel
   texture limit, and anything larger is scaled to it.
+- A font, camera raw or comic page refused for its size says "The file is
+  too large to preview" rather than calling it an image.
 
 ## [2.1.0] - 2026-09-22
 
