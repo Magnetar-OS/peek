@@ -21,6 +21,9 @@ All notable changes to this project are documented here. The format follows
   the start of each paragraph.
 - Text and Markdown files over 4 MB are no longer reported as containing
   invalid text when the preview limit falls inside a multi-byte character.
+- `nautilus_previewer = false` is honoured: Peek no longer takes
+  `org.gnome.NautilusPreviewer` from GNOME's previewer when the setting is
+  off, and turning it off while Peek is running gives the name back at once.
 
 ## [2.1.0] - 2026-09-22
 

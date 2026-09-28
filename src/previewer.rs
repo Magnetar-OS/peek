@@ -246,6 +246,22 @@ impl Service {
 /// command line and from "Open With", so a missing service is logged and the
 /// application carries on.
 pub async fn spawn() -> Option<(Service, mpsc::UnboundedReceiver<Request>)> {
+    match zbus::connection::Builder::session() {
+        Ok(builder) => spawn_on(builder).await,
+        Err(error) => {
+            tracing::warn!(%error, "could not reach the session bus");
+            None
+        }
+    }
+}
+
+/// Start the previewer service on the bus `builder` connects to.
+///
+/// [`spawn`] is this on the session bus; the tests hand it a private bus so
+/// that claiming the name never displaces the real session's previewer.
+pub(crate) async fn spawn_on(
+    builder: zbus::connection::Builder<'static>,
+) -> Option<(Service, mpsc::UnboundedReceiver<Request>)> {
     let (requests, stream) = mpsc::unbounded_channel();
     let shared = Arc::new(Mutex::new(Shared::default()));
 
@@ -257,11 +273,8 @@ pub async fn spawn() -> Option<(Service, mpsc::UnboundedReceiver<Request>)> {
     // The object server is set up before the name is requested. A client that
     // sees the name appear will call `ShowFile` immediately, and answering
     // `UnknownObject` at that point loses the very first preview.
-    let connection = match zbus::connection::Builder::session()
-        .and_then(|builder| builder.serve_at(PATH, previewer))
-        .map(zbus::connection::Builder::build)
-    {
-        Ok(future) => match future.await {
+    let connection = match builder.serve_at(PATH, previewer) {
+        Ok(builder) => match builder.build().await {
             Ok(connection) => connection,
             Err(error) => {
                 tracing::warn!(%error, "could not serve the previewer interface");
@@ -269,7 +282,7 @@ pub async fn spawn() -> Option<(Service, mpsc::UnboundedReceiver<Request>)> {
             }
         },
         Err(error) => {
-            tracing::warn!(%error, "could not reach the session bus");
+            tracing::warn!(%error, "could not serve the previewer interface");
             return None;
         }
     };
@@ -354,9 +367,90 @@ pub fn uri_from_path(path: &std::path::Path) -> Option<String> {
 /// it here keeps the dependency visible to a reader of the manifest.
 const _: Option<zvariant::Value<'static>> = None;
 
+/// A private message bus, for tests that claim bus names.
+///
+/// Claiming `org.gnome.NautilusPreviewer` on the real session bus would take
+/// the space bar from whatever previewer the developer is running, so tests
+/// start their own `dbus-daemon` and connect to that instead.
+#[cfg(test)]
+pub(crate) struct TestBus {
+    daemon: std::process::Child,
+    address: String,
+}
+
+#[cfg(test)]
+impl TestBus {
+    /// Start a bus. Panics when `dbus-daemon` is missing: a test that needs a
+    /// bus and silently skips without one proves nothing.
+    pub(crate) fn start() -> Self {
+        use std::io::BufRead as _;
+
+        let mut daemon = std::process::Command::new("dbus-daemon")
+            .args(["--session", "--nofork", "--print-address=1"])
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("dbus-daemon is installed");
+        let mut address = String::new();
+        std::io::BufReader::new(daemon.stdout.take().expect("piped stdout"))
+            .read_line(&mut address)
+            .expect("dbus-daemon prints its address");
+        Self {
+            daemon,
+            address: address.trim().to_owned(),
+        }
+    }
+
+    /// A connection builder for this bus.
+    pub(crate) fn builder(&self) -> zbus::connection::Builder<'static> {
+        zbus::connection::Builder::address(self.address.as_str()).expect("a valid bus address")
+    }
+
+    /// Whether anything owns `name` on this bus, polled until it matches
+    /// `expected` or two seconds pass: releasing a name is asynchronous.
+    pub(crate) async fn owned_within(&self, name: &str, expected: bool) -> bool {
+        let connection = self
+            .builder()
+            .build()
+            .await
+            .expect("connect to the test bus");
+        let proxy = zbus::fdo::DBusProxy::new(&connection)
+            .await
+            .expect("the bus answers");
+        let name = zbus::names::BusName::try_from(name.to_owned()).expect("a valid name");
+        for _ in 0..40 {
+            if proxy.name_has_owner(name.clone()).await.expect("asks") == expected {
+                return true;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        false
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestBus {
+    fn drop(&mut self) {
+        let _ = self.daemon.kill();
+        let _ = self.daemon.wait();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn the_name_is_claimed_while_served_and_released_when_dropped() {
+        let bus = TestBus::start();
+        let (service, _requests) = spawn_on(bus.builder()).await.expect("serves");
+        assert!(bus.owned_within(NAME, true).await, "the name is claimed");
+
+        drop(service);
+        assert!(
+            bus.owned_within(NAME, false).await,
+            "dropping the service hands the name back"
+        );
+    }
 
     #[test]
     fn local_uris_become_paths() {

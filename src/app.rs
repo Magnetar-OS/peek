@@ -355,6 +355,52 @@ pub struct App {
 }
 
 impl App {
+    /// A resident previewer with nothing shown yet.
+    ///
+    /// Separate from [`cosmic::Application::init`] so that the update loop can
+    /// be driven in tests with a default [`Core`] and settings that never touch
+    /// the user's config store.
+    fn new(core: Core, config: Config) -> Self {
+        let mut app = Self {
+            core,
+            surface: None,
+            screen: Size::new(1920.0, 1080.0),
+            scale: 1.0,
+            around: Neighbourhood::default(),
+            entry: None,
+            preview: Preview::Pending,
+            generation: 0,
+            image: None,
+            animation: None,
+            pdf_session: None,
+            preload: HashMap::new(),
+            preload_inflight: HashSet::new(),
+            pan: Vector::new(0.0, 0.0),
+            dragging: false,
+            cursor: Point::ORIGIN,
+            text_scroll: 0.0,
+            settings: false,
+            grid: false,
+            grid_index: 0,
+            thumbnails: HashMap::new(),
+            thumbnails_inflight: HashSet::new(),
+            fullscreen: false,
+            player: None,
+            pending_frames: 0,
+            page: 0,
+            zoom: 1.0,
+            config,
+            panel: Panel::new(),
+            dismissing: false,
+            blur_settled: false,
+            deferred_load: false,
+            awaiting_first_configure: false,
+            previewer: None,
+        };
+        app.panel.set_animated(app.config.animate);
+        app
+    }
+
     /// Options for the next load, resolved against the display and the theme.
     fn options(&self) -> Options {
         Options {
@@ -849,6 +895,22 @@ impl App {
         Task::batch([open_uri(&uri), self.dismiss()])
     }
 
+    /// Give up `org.gnome.NautilusPreviewer` when the settings say to.
+    ///
+    /// The subscription that owns the connection stops with the setting, but
+    /// the service is also held here, and the connection — with the name on
+    /// it — lives until the last holder lets go. Dropping this one releases
+    /// the name immediately, so turning the setting off hands the space bar
+    /// back to GNOME's previewer without a restart.
+    fn release_previewer_if_unwanted(&mut self) {
+        if !self.config.nautilus_previewer && self.previewer.take().is_some() {
+            tracing::info!(
+                name = previewer::NAME,
+                "no longer serving the file manager preview interface"
+            );
+        }
+    }
+
     /// Handle a request from the file manager.
     fn previewer_request(&mut self, request: previewer::Request) -> Task<Message> {
         match request {
@@ -1079,45 +1141,7 @@ impl cosmic::Application for App {
         core.set_keyboard_nav(false);
 
         let paths = flags.into_paths();
-
-        let mut app = Self {
-            core,
-            surface: None,
-            screen: Size::new(1920.0, 1080.0),
-            scale: 1.0,
-            around: Neighbourhood::default(),
-            entry: None,
-            preview: Preview::Pending,
-            generation: 0,
-            image: None,
-            animation: None,
-            pdf_session: None,
-            preload: HashMap::new(),
-            preload_inflight: HashSet::new(),
-            pan: Vector::new(0.0, 0.0),
-            dragging: false,
-            cursor: Point::ORIGIN,
-            text_scroll: 0.0,
-            settings: false,
-            grid: false,
-            grid_index: 0,
-            thumbnails: HashMap::new(),
-            thumbnails_inflight: HashSet::new(),
-            fullscreen: false,
-            player: None,
-            pending_frames: 0,
-            page: 0,
-            zoom: 1.0,
-            config: Config::load(),
-            panel: Panel::new(),
-            dismissing: false,
-            blur_settled: false,
-            deferred_load: false,
-            awaiting_first_configure: false,
-            previewer: None,
-        };
-
-        app.panel.set_animated(app.config.animate);
+        let mut app = Self::new(core, Config::load());
 
         // Started with files: show them. Started without: stay resident and wait
         // for the file manager, which is how the service ends up running before
@@ -1494,6 +1518,13 @@ impl cosmic::Application for App {
                 // `peek photo.png` shows the file before the bus connection is
                 // negotiated — so the current visibility has to be pushed rather
                 // than assumed false.
+                //
+                // The setting can have been turned off while the connection was
+                // being negotiated. Dropping the service here, rather than
+                // keeping it, is what hands the name straight back.
+                if !self.config.nautilus_previewer {
+                    return Task::none();
+                }
                 service.set_visible(self.surface.is_some() && !self.dismissing);
                 self.previewer = Some(service);
                 Task::none()
@@ -1503,6 +1534,7 @@ impl cosmic::Application for App {
                 let blur_changed = config.blur != self.config.blur;
                 self.config = *config;
                 self.panel.set_animated(self.config.animate);
+                self.release_previewer_if_unwanted();
                 // The panel fraction shapes render targets, so cached decodes
                 // may describe the old settings.
                 self.preload.clear();
@@ -1712,8 +1744,6 @@ impl cosmic::Application for App {
 
     fn subscription(&self) -> Subscription<Self::Message> {
         let mut subscriptions = vec![
-            // Owns the session-bus connection that serves the file manager.
-            Subscription::run(previewer_stream),
             // Settings changes, delivered by cosmic-config without a restart.
             cosmic::cosmic_config::config_subscription::<_, Config>(
                 std::any::TypeId::of::<ConfigSubscription>(),
@@ -1728,6 +1758,13 @@ impl cosmic::Application for App {
             }),
             event::listen_with(keys),
         ];
+
+        // Owns the session-bus connection that serves the file manager, and
+        // only while the settings ask for it: a user who keeps GNOME's
+        // previewer must not have it displaced every time the daemon starts.
+        if self.config.nautilus_previewer {
+            subscriptions.push(Subscription::run(previewer_stream));
+        }
 
         // Frame callbacks only while something is moving. Playback counts:
         // pulling a decoded frame has to happen at display rate, but only while
@@ -1900,6 +1937,45 @@ fn keys(event: event::Event, _status: event::Status, _id: window::Id) -> Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An app driven through `update` without a running libcosmic: default
+    /// core, and settings that never touch the user's config store.
+    fn app(config: Config) -> App {
+        App::new(Core::default(), config)
+    }
+
+    #[tokio::test]
+    async fn the_file_manager_interface_is_given_up_when_turned_off() {
+        let bus = previewer::TestBus::start();
+        let off = || {
+            Box::new(Config {
+                nautilus_previewer: false,
+                ..Config::default()
+            })
+        };
+
+        // Turned off while serving: the name goes back without a restart.
+        let mut serving = app(Config::default());
+        let (service, _requests) = previewer::spawn_on(bus.builder()).await.expect("serves");
+        let _ = serving.update(Message::PreviewerReady(std::sync::Arc::new(service)));
+        assert!(serving.previewer.is_some());
+        assert!(bus.owned_within(previewer::NAME, true).await);
+
+        let _ = serving.update(Message::ConfigChanged(off()));
+        assert!(serving.previewer.is_none());
+        assert!(
+            bus.owned_within(previewer::NAME, false).await,
+            "the name is released as soon as the setting is off"
+        );
+
+        // Turned off while the connection was still being negotiated: the
+        // service that lands afterwards is not kept.
+        let mut declined = app(*off());
+        let (service, _requests) = previewer::spawn_on(bus.builder()).await.expect("serves");
+        let _ = declined.update(Message::PreviewerReady(std::sync::Arc::new(service)));
+        assert!(declined.previewer.is_none());
+        assert!(bus.owned_within(previewer::NAME, false).await);
+    }
 
     #[test]
     fn no_paths_means_a_plain_activation() {
