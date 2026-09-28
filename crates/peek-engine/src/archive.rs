@@ -27,6 +27,13 @@ pub const MAX_ENTRIES: usize = 5_000;
 /// on a single file, reaching the byte ceiling long before the entry ceiling.
 const MAX_TAR_BYTES: u64 = 256 * 1024 * 1024;
 
+/// Memory an xz or LZMA decoder may allocate, in KiB.
+///
+/// The dictionary size is the stream's own claim, and a header can claim more
+/// than a gigabyte. `xz -9` needs 64 MiB to decode; four times that covers
+/// every preset and refuses a header that exists only to allocate.
+const DECODER_MEMORY_KIB: u32 = 256 * 1024;
+
 /// One member of an archive.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Member {
@@ -109,7 +116,10 @@ pub fn list(path: &Path, mime: &str) -> Result<Archive, Error> {
         | "application/x-xz"
         | "application/x-lzma-compressed-tar" => {
             let file = std::fs::File::open(path).map_err(io(path))?;
-            tar_stream(xz2::read::XzDecoder::new(file), "Tar (xz)")
+            tar_stream(
+                lzma_rust2::XzReader::new_mem_limit(file, true, DECODER_MEMORY_KIB),
+                "Tar (xz)",
+            )
         }
 
         "application/x-zstd-compressed-tar" | "application/zstd" => {
@@ -309,6 +319,35 @@ mod tests {
         let archive = tar_stream(std::io::Cursor::new(vec![0u8; 1024]), "Tar").expect("lists");
         assert!(archive.members.is_empty());
         assert!(!archive.truncated);
+    }
+
+    #[test]
+    fn an_xz_tar_lists_through_the_rust_decoder() {
+        let mut tarball = tar::Builder::new(Vec::new());
+        let mut header = tar::Header::new_gnu();
+        header.set_size(5);
+        header.set_mode(0o644);
+        header.set_cksum();
+        tarball
+            .append_data(&mut header, "notes.txt", &b"hello"[..])
+            .expect("append");
+        let tarball = tarball.into_inner().expect("finish the tar");
+
+        let mut xz = lzma_rust2::XzWriter::new(Vec::new(), lzma_rust2::XzOptions::with_preset(6))
+            .expect("encoder");
+        std::io::Write::write_all(&mut xz, &tarball).expect("compress");
+        let compressed = xz.finish().expect("finish the xz stream");
+
+        let path = std::env::temp_dir().join("peek-test-archive.tar.xz");
+        std::fs::write(&path, compressed).expect("write");
+
+        let archive = list(&path, "application/x-xz-compressed-tar").expect("lists");
+        assert_eq!(archive.format, "Tar (xz)");
+        assert_eq!(archive.members.len(), 1);
+        assert_eq!(archive.members[0].name, "notes.txt");
+        assert_eq!(archive.members[0].size, 5);
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `.tar.xz` archives are listed by a pure-Rust decoder, so the packages no
+  longer depend on `xz` / `liblzma`. A stream whose header asks for more than
+  256 MiB of decoder memory is refused instead of allocated.
+
 ### Fixed
 
 - A comic book (CBZ) whose page claims to be small but inflates to gigabytes

@@ -82,7 +82,9 @@ zip = { version = "8", default-features = false, features = ["deflate", "bzip2",
 tar = "0.4"
 flate2 = "1"
 bzip2 = "0.6"
-xz2 = "0.1"
+# xz through the pure-Rust decoder sevenz-rust2 already pulls in, rather than
+# a C build of liblzma for one decoder.
+lzma-rust2 = { version = "0.21", default-features = false, features = ["std", "xz"] }
 zstd = "0.14"
 # Only the header reader: nothing here decompresses or writes a 7z, so the
 # encoder, AES, bzip2 and PPMd that the default features bring are unused.
@@ -127,5 +129,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 zip = { version = "8", default-features = false, features = ["deflate"] }
 tar = "0.4"
 flate2 = "1"
+# The xz encoder, for a fixture only.
+lzma-rust2 = { version = "0.21", default-features = false, features = ["std", "xz", "encoder"] }
 # The 7z writer, for a fixture only; the library build reads headers alone.
 sevenz-rust2 = { version = "0.23", default-features = false, features = ["compress"] }

@@ -113,7 +113,7 @@ jobs:
       pkgdesc: 'Preview files without opening them'
       url: 'https://github.com/Magnetar-OS/peek'
       license: 'GPL-3.0-or-later'
-      depends: 'libxkbcommon poppler-glib cairo glib2 gstreamer gst-plugins-base-libs xz'
+      depends: 'libxkbcommon poppler-glib cairo glib2 gstreamer gst-plugins-base-libs'
       provides: 'magnetar-peek'
       conflicts: 'magnetar-peek'
       maintainer: 'Dominikos Pritis <dominikos.pritis@gmail.com>'
