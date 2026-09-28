@@ -1904,10 +1904,12 @@ impl cosmic::Application for App {
             }
 
             // A desktop entry launched us with files — "Open With → Peek".
+            // Resolved the way the command line resolves its arguments, so a
+            // mounted share and a path through a symlink mean the same here.
             Details::Open { url } => self.update(Message::Show {
                 paths: url
                     .iter()
-                    .filter_map(|url| url.to_file_path().ok())
+                    .filter_map(|url| previewer::resolve(url.as_str()))
                     .collect(),
                 index: 0,
             }),
@@ -2064,6 +2066,33 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn open_with_resolves_a_path_the_way_the_command_line_does() {
+        use cosmic::Application as _;
+
+        let dir = std::env::temp_dir().join("peek-test-app-open-with");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("real")).expect("create");
+        std::fs::write(dir.join("real/a.txt"), "a").expect("write");
+        std::fs::write(dir.join("real/b.txt"), "b").expect("write");
+        std::os::unix::fs::symlink(dir.join("real"), dir.join("link")).expect("symlink");
+
+        let through_link = url::Url::from_file_path(dir.join("link/a.txt")).expect("a file URL");
+        let mut app = app(Config::default());
+        let _ = app.dbus_activation(cosmic::dbus_activation::Message {
+            activation_token: None,
+            desktop_startup_id: None,
+            msg: cosmic::dbus_activation::Details::Open {
+                url: vec![through_link],
+            },
+        });
+
+        let real = dir.join("real/a.txt").canonicalize().expect("exists");
+        assert_eq!(app.around.current(), Some(real.as_path()));
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

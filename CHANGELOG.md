@@ -74,6 +74,10 @@ All notable changes to this project are documented here. The format follows
   (they said `peek`, which is a different program), and the help lists every
   key, including <kbd>F</kbd>, <kbd>G</kbd>, <kbd>K</kbd>, Page Up/Down and
   <kbd>Ctrl</kbd>+<kbd>C</kbd>.
+- "Open With → Peek" on a file in a mounted network share, or reached
+  through a symlinked folder, previews it and its real neighbours, the same
+  as the command line. Before, a share's `smb://` URI was dropped and a
+  symlinked path built the arrow-key neighbourhood around the link.
 
 ## [2.1.0] - 2026-09-22
 

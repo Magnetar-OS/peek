@@ -339,6 +339,27 @@ pub fn path_from_uri(uri: &str) -> Option<PathBuf> {
     mounted_path(uri)
 }
 
+/// Turn a path or URI handed in from outside into the file it names.
+///
+/// Every way in — the command line, "Open With", the file manager — goes
+/// through here, so they agree on what a name means: a URI is resolved
+/// through [`path_from_uri`] (so an already-mounted `smb://` share works and
+/// an unmounted one is declined), and the result is made absolute with its
+/// symlinks resolved, which is what the file manager shows and what the
+/// neighbourhood has to be built around. `None`, logged, when nothing is
+/// there.
+#[must_use]
+pub fn resolve(argument: &str) -> Option<PathBuf> {
+    let path = path_from_uri(argument).unwrap_or_else(|| PathBuf::from(argument));
+    match path.canonicalize() {
+        Ok(path) => Some(path),
+        Err(error) => {
+            tracing::warn!(%error, path = %path.display(), "skipping");
+            None
+        }
+    }
+}
+
 /// Where GVFS has mounted a remote URI, if it has.
 ///
 /// GIO owns this mapping — the FUSE daemon's path for a mount is not derivable

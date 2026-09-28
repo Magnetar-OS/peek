@@ -137,20 +137,8 @@ fn resolve(arguments: &[String]) -> Vec<String> {
         // silently previewing a file called `--verbose` is not worth the
         // surprise.
         .filter(|argument| !argument.starts_with('-'))
-        .filter_map(|argument| {
-            let path = previewer::path_from_uri(argument)
-                .unwrap_or_else(|| std::path::PathBuf::from(argument));
-
-            // `canonicalize` also resolves symlinks, which is what the file
-            // manager shows and what the neighbourhood has to be built around.
-            match path.canonicalize() {
-                Ok(path) => Some(path.to_string_lossy().into_owned()),
-                Err(error) => {
-                    tracing::warn!(%error, path = %path.display(), "skipping");
-                    None
-                }
-            }
-        })
+        .filter_map(|argument| previewer::resolve(argument.as_str()))
+        .map(|path| path.to_string_lossy().into_owned())
         .collect()
 }
 
