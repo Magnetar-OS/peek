@@ -112,10 +112,12 @@ pub fn list(path: &Path, mime: &str) -> Result<Archive, Error> {
         }
         "application/x-bzip" | "application/x-bzip2" => tar_if_tar(bzip2(path)?, BZIP2),
 
-        "application/x-xz-compressed-tar" | "application/x-lzma-compressed-tar" => {
-            tar_stream(xz(path)?, XZ)
-        }
+        "application/x-xz-compressed-tar" => tar_stream(xz(path)?, XZ),
         "application/x-xz" => tar_if_tar(xz(path)?, XZ),
+
+        // `.tar.lzma` is the older LZMA-alone container, not xz: same codec,
+        // a different header, and an xz decoder rejects it.
+        "application/x-lzma-compressed-tar" => tar_stream(lzma(path)?, "Tar (lzma)"),
 
         "application/x-zstd-compressed-tar" => tar_stream(zstd(path)?, ZSTD),
         "application/zstd" => tar_if_tar(zstd(path)?, ZSTD),
@@ -147,6 +149,11 @@ fn xz(path: &Path) -> Result<impl Read, Error> {
         true,
         DECODER_MEMORY_KIB,
     ))
+}
+
+fn lzma(path: &Path) -> Result<impl Read, Error> {
+    lzma_rust2::LzmaReader::new_mem_limit(open(path)?, DECODER_MEMORY_KIB, None)
+        .map_err(|error| Error::Damaged(error.to_string()))
 }
 
 fn zstd(path: &Path) -> Result<impl Read, Error> {
@@ -470,6 +477,36 @@ mod tests {
         assert_eq!(archive.members.len(), 1);
         assert_eq!(archive.members[0].name, "notes.txt");
         assert_eq!(archive.members[0].size, 5);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_tar_lzma_lists_through_the_lzma_alone_decoder() {
+        // `.tar.lzma` is LZMA-alone, not xz; an xz decoder rejects it.
+        let mut tarball = tar::Builder::new(Vec::new());
+        let mut header = tar::Header::new_gnu();
+        header.set_size(3);
+        header.set_mode(0o644);
+        header.set_cksum();
+        tarball
+            .append_data(&mut header, "old.txt", &b"abc"[..])
+            .expect("append");
+        let tarball = tarball.into_inner().expect("finish the tar");
+
+        let mut lzma = lzma_rust2::LzmaWriter::new_use_header(
+            Vec::new(),
+            &lzma_rust2::LzmaOptions::with_preset(6),
+            Some(tarball.len() as u64),
+        )
+        .expect("encoder");
+        std::io::Write::write_all(&mut lzma, &tarball).expect("compress");
+        let path = std::env::temp_dir().join("peek-test-archive.tar.lzma");
+        std::fs::write(&path, lzma.finish().expect("finish")).expect("write");
+
+        let archive = list(&path, "application/x-lzma-compressed-tar").expect("lists");
+        assert_eq!(archive.members.len(), 1);
+        assert_eq!(archive.members[0].name, "old.txt");
 
         let _ = std::fs::remove_file(path);
     }

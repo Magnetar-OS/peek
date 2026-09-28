@@ -41,6 +41,8 @@ All notable changes to this project are documented here. The format follows
   image) shows its details instead of "The file could not be decoded", and
   so do RAR, ISO, `.deb` and `.rpm` files, which Peek does not list. Those
   four can now be claimed by a plugin.
+- `.tar.lzma` archives are listed. They are LZMA-alone streams, not xz, and
+  were handed to the xz decoder, which rejects them.
 
 ## [2.1.0] - 2026-09-22
 
