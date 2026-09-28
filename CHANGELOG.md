@@ -62,6 +62,9 @@ All notable changes to this project are documented here. The format follows
   intended: a 4K video's poster was the full 33 MB frame and an 8K video had
   none. Anamorphic video (a DVD's 720 stored columns shown at 16:9) gets a
   poster in its displayed shape.
+- Matroska files preview and play. `.mkv` and `.mka` were detected as
+  `application/x-matroska`, which nothing claimed, so they showed only the
+  metadata card.
 
 ## [2.1.0] - 2026-09-22
 

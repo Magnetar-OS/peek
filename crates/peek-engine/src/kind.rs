@@ -317,6 +317,17 @@ const ZIP_CONTAINED: &[(&str, &str)] = &[
     ("odt", "application/vnd.oasis.opendocument.text"),
 ];
 
+/// Extensions that say what a Matroska file holds.
+///
+/// Magic identifies the EBML container and stops there: `.mkv`, `.mka` and
+/// `.mk3d` all sniff as `application/x-matroska`, and `shared-mime-info`
+/// tells them apart by glob, the same as the zip family.
+const MATROSKA_CONTAINED: &[(&str, &str)] = &[
+    ("mkv", "video/x-matroska"),
+    ("mk3d", "video/x-matroska-3d"),
+    ("mka", "audio/x-matroska"),
+];
+
 /// Narrow a generic sniff using the file name.
 ///
 /// Only applies when the sniffed type is one of [`GENERIC`] or a bare zip, so
@@ -328,6 +339,8 @@ fn refine<'a>(sniffed: &'a str, path: &Path) -> &'a str {
         CONTAINED
     } else if sniffed == "application/zip" {
         ZIP_CONTAINED
+    } else if sniffed == "application/x-matroska" {
+        MATROSKA_CONTAINED
     } else {
         return sniffed;
     };
@@ -382,7 +395,9 @@ pub fn classify(mime: &str, path: &Path) -> Kind {
         return Kind::Image;
     }
 
-    if mime.starts_with("video/") {
+    // A Matroska file whose name did not say what it holds is played like
+    // any other: the probe finds out whether there is a picture.
+    if mime.starts_with("video/") || mime == "application/x-matroska" {
         return Kind::Video;
     }
     if mime.starts_with("audio/") {
@@ -589,6 +604,28 @@ mod tests {
             classify("font/woff2", &PathBuf::from("a.woff2")),
             Kind::Other
         );
+    }
+
+    #[test]
+    fn matroska_is_played_and_named_by_its_extension() {
+        // What magic answers for every .mkv, .mka and .mk3d.
+        let sniffed = "application/x-matroska";
+        assert_eq!(
+            refine(sniffed, &PathBuf::from("film.mkv")),
+            "video/x-matroska"
+        );
+        assert_eq!(
+            refine(sniffed, &PathBuf::from("track.mka")),
+            "audio/x-matroska"
+        );
+        assert_eq!(
+            classify(
+                refine(sniffed, &PathBuf::from("track.mka")),
+                &PathBuf::from("track.mka")
+            ),
+            Kind::Audio
+        );
+        assert_eq!(classify(sniffed, &PathBuf::from("capture")), Kind::Video);
     }
 
     #[test]
