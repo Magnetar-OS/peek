@@ -12,6 +12,9 @@ All notable changes to this project are documented here. The format follows
   is refused instead of being read into memory. Before, such a file could
   exhaust memory in the previewer or in `peek-thumbnailer` when a file manager
   thumbnailed its folder.
+- The index sheet (<kbd>G</kbd>) is drawn in the same column the arrow keys
+  and the backdrop blur assume, so <kbd>↑</kbd>/<kbd>↓</kbd> move by one
+  visible row.
 
 ## [2.1.0] - 2026-09-22
 

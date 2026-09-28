@@ -113,11 +113,7 @@ pub struct Frame<'a> {
 impl Frame<'_> {
     /// How the overlay is being shown, for the geometry functions.
     fn layout(&self) -> surface::Layout {
-        surface::Layout {
-            zoom: self.zoom,
-            fullscreen: self.fullscreen,
-            settings: self.settings,
-        }
+        surface::Layout::new(self.zoom, self.fullscreen, self.settings, self.grid)
     }
 }
 
@@ -1624,6 +1620,47 @@ mod tests {
         let colour = Color::from_rgba(1.0, 1.0, 1.0, 1.0);
         assert_eq!(fade(colour, 2.0).a, 1.0);
         assert_eq!(fade(colour, -1.0).a, 0.0);
+    }
+
+    #[test]
+    fn the_index_sheet_is_laid_out_in_the_reading_column() {
+        // The app traces the blur region and moves the grid cursor by rows
+        // computed from its own layout; the view must draw the same panel, or
+        // the up arrow jumps by a different number of cells than a visible row.
+        let panel = Panel::new();
+        let preview = Preview::Pending;
+        let around = Neighbourhood::default();
+        let thumbnails = std::collections::HashMap::new();
+        let config = Config::default();
+        let frame = Frame {
+            panel: &panel,
+            now: Instant::now(),
+            screen: Size::new(1920.0, 1080.0),
+            preview: &preview,
+            entry: None,
+            image: None,
+            around: &around,
+            player: None,
+            zoom: 1.0,
+            pan: Vector::new(0.0, 0.0),
+            text_scroll: 0.0,
+            animated: false,
+            fullscreen: false,
+            settings: false,
+            grid: true,
+            grid_index: 0,
+            thumbnails: &thumbnails,
+            config: &config,
+        };
+
+        assert_eq!(
+            frame.layout(),
+            surface::Layout::new(1.0, false, false, true)
+        );
+        assert!(
+            frame.layout().settings,
+            "the sheet takes the list column, as the app computes it"
+        );
     }
 
     #[test]

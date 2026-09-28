@@ -636,12 +636,7 @@ impl App {
 
     /// How the overlay is being shown, for the geometry functions.
     fn layout(&self) -> surface::Layout {
-        surface::Layout {
-            zoom: self.zoom,
-            fullscreen: self.fullscreen,
-            // Both are lists rather than a file, and want the same column.
-            settings: self.settings || self.grid,
-        }
+        surface::Layout::new(self.zoom, self.fullscreen, self.settings, self.grid)
     }
 
     /// Start rendering the thumbnails the index sheet needs.

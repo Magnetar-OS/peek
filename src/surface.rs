@@ -129,6 +129,24 @@ pub struct Layout {
     pub settings: bool,
 }
 
+impl Layout {
+    /// The layout for what the overlay is showing.
+    ///
+    /// The index sheet and the settings list are both lists rather than a
+    /// file, so both take the reading column. Decided here, once: the app
+    /// traces the blur region and moves the grid cursor from this layout, the
+    /// view draws the panel from it, and the two must not disagree about the
+    /// panel's shape.
+    #[must_use]
+    pub fn new(zoom: f32, fullscreen: bool, settings: bool, grid: bool) -> Self {
+        Self {
+            zoom,
+            fullscreen,
+            settings: settings || grid,
+        }
+    }
+}
+
 impl Default for Layout {
     fn default() -> Self {
         Self {
