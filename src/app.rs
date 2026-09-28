@@ -359,6 +359,10 @@ pub struct App {
 
     /// The `org.gnome.NautilusPreviewer2` service, when it could be started.
     previewer: Option<std::sync::Arc<previewer::Service>>,
+
+    /// Whether the desktop was in dark mode when the theme was last seen, so a
+    /// theme change can tell a light/dark switch from any other edit.
+    dark: bool,
 }
 
 impl App {
@@ -406,6 +410,7 @@ impl App {
             deferred_load: false,
             awaiting_first_configure: false,
             previewer: None,
+            dark: cosmic::theme::is_dark(),
         };
         app.panel.set_animated(app.config.animate);
         app
@@ -1602,12 +1607,26 @@ impl cosmic::Application for App {
             }
 
             Message::ThemeChanged => {
-                // The palette decides how source is highlighted, and the
-                // frosted setting decides whether the backdrop is blurred, so a
-                // theme change has to reach both. Preloads were highlighted for
-                // the old palette.
+                // The frosted setting decides whether the backdrop is blurred,
+                // so every theme change reaches the blur region. Only a switch
+                // between light and dark reaches the decode: the palette is
+                // what source is highlighted with, and nothing else a preview
+                // holds depends on the theme. Re-decoding on an accent edit
+                // would restart a playing video for nothing.
+                let dark = cosmic::theme::is_dark();
+                let palette_changed = dark != self.dark;
+                self.dark = dark;
+                if !palette_changed {
+                    return self.refresh_blur();
+                }
+
+                // Preloads were highlighted for the old palette.
                 self.preload.clear();
-                Task::batch([self.reload(), self.refresh_blur()])
+                // A hidden overlay re-decodes when it is next shown anyway.
+                if self.surface.is_some() && matches!(self.preview, Preview::Text(_)) {
+                    return Task::batch([self.reload(), self.refresh_blur()]);
+                }
+                self.refresh_blur()
             }
 
             Message::Dismiss => self.dismiss(),
@@ -2032,6 +2051,43 @@ mod tests {
         permits.close();
         let ran = run_bounded(permits, || true).await;
         assert!(ran.is_none(), "nobody is waiting for the result");
+    }
+
+    /// An app showing a text file on a mapped overlay.
+    fn showing_text(name: &str) -> (App, PathBuf) {
+        let path = std::env::temp_dir().join(name);
+        std::fs::write(&path, "fn main() {}\n").expect("write");
+        let mut app = app(Config::default());
+        app.around = Neighbourhood::from_list(vec![path.clone()], 0);
+        app.preview = Preview::Text(Box::default());
+        app.surface = Some(window::Id::unique());
+        (app, path)
+    }
+
+    #[test]
+    fn a_theme_edit_in_the_same_mode_does_not_re_decode() {
+        let (mut app, path) = showing_text("peek-test-app-theme-same.rs");
+        let before = app.generation;
+
+        // An accent colour or frosted edit: the mode is what it was.
+        let _ = app.update(Message::ThemeChanged);
+        assert_eq!(app.generation, before, "nothing was re-decoded");
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_switch_between_light_and_dark_re_highlights_text() {
+        let (mut app, path) = showing_text("peek-test-app-theme-switch.rs");
+        // As if the mode flipped since the preview was decoded.
+        app.dark = !cosmic::theme::is_dark();
+        let before = app.generation;
+
+        let _ = app.update(Message::ThemeChanged);
+        assert_ne!(app.generation, before, "the text is highlighted again");
+        assert_eq!(app.dark, cosmic::theme::is_dark());
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

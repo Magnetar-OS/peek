@@ -47,6 +47,9 @@ All notable changes to this project are documented here. The format follows
   the display's scale factor or size, instead of staying at the 1× size on a
   HiDPI display. Photos are no longer decoded a second time when that
   happens, which also stopped animated images restarting.
+- Changing the accent colour or the frosted setting no longer restarts a
+  playing video or re-decodes the file on screen. Switching between light
+  and dark re-highlights source text, and nothing else.
 
 ## [2.1.0] - 2026-09-22
 
