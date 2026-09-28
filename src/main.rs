@@ -7,35 +7,39 @@ mod anim;
 mod app;
 mod config;
 mod fonts;
+mod keys;
 mod localize;
 mod previewer;
 mod surface;
 mod view;
 
-const USAGE: &str = "\
-peek — preview files without opening them
+/// The command, as installed.
+const COMMAND: &str = env!("CARGO_BIN_NAME");
+
+/// `--help`. The keys come from the table the key handler reads, so the two
+/// cannot drift apart.
+fn usage() -> String {
+    format!(
+        "\
+{COMMAND} — preview files without opening them
 
 Usage:
-  peek [FILE…]        Preview the files. With one file, the arrow keys move
-                      through the rest of its directory.
-  peek                Toggle the last preview, or wait for a file manager.
+  {COMMAND} [FILE…]  Preview the files. With one file, the arrow keys
+                         move through the rest of its directory.
+  {COMMAND}          Toggle the last preview, or wait for a file manager.
 
 Options:
-  -h, --help          Show this message
-  -V, --version       Show the version
+  -h, --help             Show this message
+  -V, --version          Show the version
 
 Keys:
-  Space, Escape       Close
-  Left, Right         Previous and next file
-  Up, Down            Previous and next page
-  Shift+Left/Right    Seek in audio and video
-  P                   Play and pause
-  +, -, 0             Zoom in, out, and reset
-  Enter               Open in the default application
-
-The first invocation becomes a daemon and stays resident, so binding `peek` to
-a shortcut toggles rather than starting a second copy.
-";
+{keys}
+The first invocation becomes a daemon and stays resident, so binding
+`{COMMAND}` to a shortcut toggles rather than starting a second copy.
+",
+        keys = keys::help(),
+    )
+}
 
 fn main() -> cosmic::iced::Result {
     init_logging();
@@ -44,14 +48,14 @@ fn main() -> cosmic::iced::Result {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
 
     if arguments.iter().any(|arg| arg == "-h" || arg == "--help") {
-        print!("{USAGE}");
+        print!("{}", usage());
         return Ok(());
     }
     if arguments
         .iter()
         .any(|arg| arg == "-V" || arg == "--version")
     {
-        println!("peek {}", env!("CARGO_PKG_VERSION"));
+        println!("{COMMAND} {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
 
@@ -153,6 +157,17 @@ fn resolve(arguments: &[String]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_help_names_the_installed_command() {
+        let usage = usage();
+        assert!(usage.starts_with("magnetar-peek — "));
+        assert!(usage.contains("  magnetar-peek [FILE…]"));
+        assert!(
+            !usage.contains("\n  peek "),
+            "the bare `peek` is another program"
+        );
+    }
 
     #[test]
     fn flags_are_not_treated_as_files() {

@@ -159,17 +159,19 @@ daemon started by D-Bus activation has a stderr nobody can see.
 | --- | --- |
 | <kbd>Space</kbd>, <kbd>Esc</kbd> | Close |
 | <kbd>←</kbd> <kbd>→</kbd> | Previous and next file |
-| <kbd>↑</kbd> <kbd>↓</kbd> | Previous and next page — or file, where there are no pages |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Page Up</kbd> <kbd>Page Down</kbd> | Previous and next page — or file, where there are no pages |
 | <kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd> | Seek five seconds |
-| <kbd>P</kbd> | Play and pause |
+| <kbd>P</kbd>, <kbd>K</kbd> | Play and pause |
 | <kbd>+</kbd> <kbd>-</kbd> <kbd>0</kbd> | Zoom in, out, reset |
 | <kbd>F</kbd>, <kbd>F11</kbd> | Fullscreen — the file gets the display |
 | <kbd>G</kbd> | The index sheet: every file in the selection, at once |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Copy the file's path |
 | <kbd>Enter</kbd> | Open in the default application |
 
-<kbd>Space</kbd> and <kbd>Esc</kbd> mean "back": they leave fullscreen if it is
-on, and close the preview otherwise.
+<kbd>Space</kbd> and <kbd>Esc</kbd> mean "back": they leave the settings panel,
+the index sheet or fullscreen, whichever is showing, and close the preview
+otherwise. `magnetar-peek --help` prints this table from the one the key
+handler reads.
 
 The pointer works too: scrolling over an image, page, or video zooms it,
 dragging pans it once zoom has cropped it, double-clicking jumps between the

@@ -37,8 +37,6 @@ use std::time::{Duration, Instant};
 
 use cosmic::Application as _;
 use cosmic::app::{Core, Task};
-use cosmic::iced::keyboard::Key;
-use cosmic::iced::keyboard::key::Named;
 use cosmic::iced::{Point, Size, Subscription, Vector, event, keyboard, window};
 use cosmic::widget::image;
 use peek_engine::{Entry, Neighbourhood, Options, Player, Preview};
@@ -1951,58 +1949,15 @@ fn previewer_stream() -> impl cosmic::iced::futures::Stream<Item = Message> {
     })
 }
 
-/// Keyboard handling.
+/// Keyboard and surface events.
 ///
 /// Lives on the global event listener rather than on a focused widget: the
-/// overlay has no text input to focus, and every key here has to work whatever
-/// the pointer happens to be over.
+/// overlay has no text input to focus, and every key has to work whatever the
+/// pointer happens to be over. Which key does what is [`crate::keys`].
 fn keys(event: event::Event, _status: event::Status, _id: window::Id) -> Option<Message> {
     match event {
         event::Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) => {
-            match key {
-                Key::Named(Named::Escape) => Some(Message::Escape),
-
-                Key::Named(Named::F11) => Some(Message::ToggleFullscreen),
-
-                // Shift turns the horizontal arrows into a scrub, so a video can
-                // be seeked without giving up arrow-key navigation between
-                // files.
-                Key::Named(Named::ArrowLeft) if modifiers.shift() => Some(Message::Seek(-1)),
-                Key::Named(Named::ArrowRight) if modifiers.shift() => Some(Message::Seek(1)),
-
-                // The arrows address whatever is on screen. In the index
-                // sheet that is the grid's cursor; otherwise it is the
-                // selection and the page.
-                Key::Named(Named::ArrowLeft) => Some(Message::Navigate(Nav::Left)),
-                Key::Named(Named::ArrowRight) => Some(Message::Navigate(Nav::Right)),
-
-                // Vertical arrows turn pages where there are pages to turn, and
-                // move between files where there are not — so they do the
-                // obvious thing in both cases without a mode.
-                Key::Named(Named::ArrowUp | Named::PageUp) => Some(Message::Navigate(Nav::Up)),
-                Key::Named(Named::ArrowDown | Named::PageDown) => {
-                    Some(Message::Navigate(Nav::Down))
-                }
-
-                Key::Named(Named::Enter) => Some(Message::Activate),
-
-                Key::Character(ref c) => match c.as_str() {
-                    // Space arrives as a character rather than as a named key.
-                    // It closes, the way it does in QuickLook: the key that
-                    // opened the preview is the key that takes it away.
-                    " " => Some(Message::Escape),
-                    "f" => Some(Message::ToggleFullscreen),
-                    "c" if modifiers.control() => Some(Message::CopyPath),
-                    "+" | "=" => Some(Message::Zoom(1.25)),
-                    "-" | "_" => Some(Message::Zoom(0.8)),
-                    "0" => Some(Message::ResetZoom),
-                    "p" | "k" => Some(Message::TogglePlay),
-                    "g" => Some(Message::ToggleGrid),
-                    _ => None,
-                },
-
-                _ => None,
-            }
+            crate::keys::message(&key, modifiers)
         }
         event::Event::Window(window::Event::Opened { size, .. }) => Some(Message::Configured(size)),
         event::Event::Window(window::Event::Resized(size)) => Some(Message::Configured(size)),

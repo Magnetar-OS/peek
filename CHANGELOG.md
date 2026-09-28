@@ -70,6 +70,10 @@ All notable changes to this project are documented here. The format follows
   texture limit, and anything larger is scaled to it.
 - A font, camera raw or comic page refused for its size says "The file is
   too large to preview" rather than calling it an image.
+- `magnetar-peek --help` and `--version` name the command as installed
+  (they said `peek`, which is a different program), and the help lists every
+  key, including <kbd>F</kbd>, <kbd>G</kbd>, <kbd>K</kbd>, Page Up/Down and
+  <kbd>Ctrl</kbd>+<kbd>C</kbd>.
 
 ## [2.1.0] - 2026-09-22
 
