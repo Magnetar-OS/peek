@@ -2096,7 +2096,7 @@ mod tests {
 
         // The same settings arriving again (the store echoing a panel edit)
         // changes nothing.
-        let _ = app.update(Message::ConfigChanged(Box::new(Config::default())));
+        let _ = app.update(Message::ConfigChanged(Box::default()));
         assert_eq!(app.generation, before);
 
         let _ = app.update(Message::ConfigChanged(Box::new(Config {
