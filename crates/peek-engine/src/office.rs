@@ -123,6 +123,9 @@ fn extract(xml: &str, dialect: Dialect) -> Result<Vec<String>, quick_xml::Error>
     // Depth of `w:t` / ODF paragraph nesting we are inside — text outside it
     // is instructions and metadata, not prose.
     let mut capturing: u32 = 0;
+    // Depth of WordprocessingML `w:tabs`, where `w:tab` *defines* a tab stop
+    // in the paragraph's properties rather than being one in its text.
+    let mut tab_stops: u32 = 0;
     let push_line = |lines: &mut Vec<String>, current: &mut String| {
         if lines.len() < text::MAX_LINES {
             lines.push(std::mem::take(current));
@@ -143,11 +146,13 @@ fn extract(xml: &str, dialect: Dialect) -> Result<Vec<String>, quick_xml::Error>
                 // codes end up in the preview.
                 "t" if dialect == Dialect::Word => capturing += 1,
                 "p" | "h" if dialect == Dialect::OpenDocument => capturing += 1,
+                "tabs" if dialect == Dialect::Word => tab_stops += 1,
                 _ => {}
             },
 
             Event::End(element) => match element.local_name().as_ref() {
                 "t" if dialect == Dialect::Word => capturing = capturing.saturating_sub(1),
+                "tabs" if dialect == Dialect::Word => tab_stops = tab_stops.saturating_sub(1),
                 "p" | "h" => {
                     if dialect == Dialect::OpenDocument {
                         capturing = capturing.saturating_sub(1);
@@ -158,7 +163,7 @@ fn extract(xml: &str, dialect: Dialect) -> Result<Vec<String>, quick_xml::Error>
             },
 
             Event::Empty(element) => match element.local_name().as_ref() {
-                "tab" => current.push('\t'),
+                "tab" if tab_stops == 0 => current.push('\t'),
                 "br" | "line-break" => push_line(&mut lines, &mut current),
                 // ODF compresses runs of spaces into `<text:s text:c="N"/>`.
                 "s" => {
@@ -265,6 +270,22 @@ mod tests {
 
         let document = text(&path, DOCX).expect("extracts");
         assert_eq!(document.lines[0].plain(), "Real text.");
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn tab_stop_definitions_are_not_tabs() {
+        // `w:tab` inside `w:pPr/w:tabs` *defines* a tab stop; only a `w:tab`
+        // in a run is a tab character. Paragraphs with custom stops — TOCs,
+        // letterheads, forms — must not grow a tab per stop.
+        let xml = r#"<w:document xmlns:w="ns"><w:body>
+            <w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="720"/><w:tab w:val="right" w:pos="9000"/></w:tabs></w:pPr><w:r><w:t>Chapter</w:t></w:r><w:r><w:tab/><w:t>12</w:t></w:r></w:p>
+        </w:body></w:document>"#;
+        let path = zip_with("word/document.xml", xml, "peek-test-office-tabs.docx");
+
+        let document = text(&path, DOCX).expect("extracts");
+        assert_eq!(document.lines[0].plain(), "Chapter\t12");
 
         let _ = std::fs::remove_file(path);
     }

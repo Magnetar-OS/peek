@@ -17,6 +17,8 @@ All notable changes to this project are documented here. The format follows
   visible row.
 - A command plugin receives the right file when its name contains `%o`, `%s`
   or `%i`; the placeholders are no longer substituted inside the file name.
+- Word documents with custom tab stops no longer preview with stray tabs at
+  the start of each paragraph.
 
 ## [2.1.0] - 2026-09-22
 
