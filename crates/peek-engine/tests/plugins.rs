@@ -71,6 +71,31 @@ fn plugins_add_previewers_without_disturbing_the_built_in_ones() {
     )
     .expect("write the plugin");
 
+    // The shipped example, installed the way a user would: renamed to
+    // `.toml`. Its rules have to do what its comments say.
+    std::fs::copy(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../res/plugins/com.magnetaros.Peek.example-text.toml"
+        ),
+        fixtures.0.join("plugins/30-example-text.toml"),
+    )
+    .expect("install the example plugin");
+
+    // A rule that tries to re-highlight a language peek already knows.
+    std::fs::write(
+        fixtures.0.join("plugins/40-override.toml"),
+        r#"
+        name = "Rust as TOML"
+
+        [[previewer]]
+        extensions = ["rs"]
+        handler = "text"
+        syntax = "TOML"
+        "#,
+    )
+    .expect("write the plugin");
+
     // Set before anything touches the registry, which is why this test is
     // alone in its binary.
     unsafe {
@@ -100,6 +125,31 @@ fn plugins_add_previewers_without_disturbing_the_built_in_ones() {
             );
         }
         other => panic!("expected the plugin's text preview, got {other:?}"),
+    }
+
+    // A file that reads as text is text whatever a plugin says, but a text
+    // rule adds the syntax when nothing built in knows the extension.
+    let text = fixtures.write("settings.peekconf", b"key = 1\n");
+    let (kind, previewed) = load(&text);
+    assert_eq!(kind, peek_engine::Kind::Text, "built-in detection decides");
+    match previewed {
+        Preview::Text(document) => assert_eq!(document.language.as_deref(), Some("TOML")),
+        other => panic!("expected text, got {other:?}"),
+    }
+    let recipe = fixtures.write("release.just", b"build:\n\tcargo build\n");
+    match load(&recipe).1 {
+        Preview::Text(document) => assert_eq!(
+            document.language.as_deref(),
+            Some("Makefile"),
+            "the shipped example's rule applies"
+        ),
+        other => panic!("expected text, got {other:?}"),
+    }
+    // A syntax the file's name already selects is not replaced.
+    let source = fixtures.write("main.rs", b"fn main() {}\n");
+    match load(&source).1 {
+        Preview::Text(document) => assert_eq!(document.language.as_deref(), Some("Rust")),
+        other => panic!("expected text, got {other:?}"),
     }
 
     // The command plugin: its output is what is shown.

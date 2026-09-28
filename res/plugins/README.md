@@ -8,6 +8,13 @@ that currently show the metadata card. A plugin can therefore add previews and
 can never break one: installing it cannot change how your photographs, source
 files, or PDFs look.
 
+The one addition to a built-in preview is highlighting: a file that already
+reads as text is shown as text, but when peek knows no syntax for its
+extension, a `text` rule that names one supplies it. A syntax peek already
+knows for the extension is never replaced.
+
+Rules match extensions and MIME types, not whole file names.
+
 ## Routing a type to a previewer peek already has
 
 The common case is not "decode a new format", it is "this extension is really

@@ -221,7 +221,11 @@ pub fn load(entry: &Entry, options: Options) -> Preview {
             Err(error) => failed(reason_for_pdf(&error), error, card()),
         },
 
-        Kind::Text => match crate::text::load(&entry.path, options.dark) {
+        Kind::Text => match crate::text::load_with_fallback(
+            &entry.path,
+            options.dark,
+            crate::plugin::registry().syntax_for(&entry.mime, &entry.path),
+        ) {
             Ok(document) => Preview::Text(Box::new(document)),
             // Reading is the only way a text preview fails.
             Err(error) => failed(Reason::Unreadable, error, card()),

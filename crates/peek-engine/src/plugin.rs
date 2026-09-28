@@ -54,6 +54,11 @@
 //! content-first detection rule stays intact: a PNG is a PNG whatever a
 //! plugin claims about `.png`.
 //!
+//! The one addition to a built-in preview is a syntax: a file that sniffs as
+//! text is text, but when nothing built in knows the syntax for its
+//! extension, a text rule naming one supplies it
+//! ([`Registry::syntax_for`]). That adds highlighting and replaces none.
+//!
 //! ## Plugins run code
 //!
 //! A command plugin is an executable the user installed, run with the user's
@@ -225,6 +230,23 @@ impl Registry {
             .iter()
             .flat_map(|plugin| &plugin.rules)
             .find(|rule| rule.matches(mime, path))
+    }
+
+    /// The syntax a text rule names for a file, when one claims it.
+    ///
+    /// Text is the one case where a plugin is consulted for a file that
+    /// already has a previewer: a file that sniffs as text is shown as text
+    /// whatever any plugin says, but when nothing built in knows its syntax,
+    /// a rule naming one adds the highlighting. It adds; it never replaces —
+    /// a syntax the file's name already selects wins.
+    #[must_use]
+    pub fn syntax_for(&self, mime: &str, path: &Path) -> Option<&str> {
+        self.plugins
+            .iter()
+            .flat_map(|plugin| &plugin.rules)
+            .filter(|rule| rule.handler == Handler::Text)
+            .find(|rule| rule.matches(mime, path))
+            .and_then(|rule| rule.syntax.as_deref())
     }
 
     #[must_use]

@@ -82,6 +82,11 @@ All notable changes to this project are documented here. The format follows
   `Inter-Bold.ttf` after `Inter-Regular.ttf` drew the bold specimen in the
   regular face, and previewing a font of the interface's own family could
   change the overlay's own text.
+- A `text` plugin rule highlights files that already read as text, when
+  Peek knows no syntax for their extension — the case the plugin guide and
+  the shipped example were written for, which never took effect because
+  plugins were consulted only for files with no previewer. The example no
+  longer claims `justfile`, a file name no rule can match.
 
 ## [2.1.0] - 2026-09-22
 

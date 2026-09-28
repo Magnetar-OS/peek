@@ -236,7 +236,24 @@ pub(crate) fn highlight_snippet(code: &str, language: &str, theme: &Theme) -> Op
 /// UTF-8 is decoded lossily and flagged rather than rejected — a log with one
 /// bad byte in it is still a log.
 pub fn load(path: &Path, dark: bool) -> Result<Document, Error> {
-    load_with_syntax(path, dark, None)
+    highlight(path, dark, None, None)
+}
+
+/// Read and highlight a text file, with a syntax to fall back on.
+///
+/// `fallback` is used only when the file's name selects no syntax of its
+/// own — it is what a plugin rule adds for an extension nothing built in
+/// knows, and it must not override one that is known.
+///
+/// # Errors
+///
+/// As [`load`].
+pub fn load_with_fallback(
+    path: &Path,
+    dark: bool,
+    fallback: Option<&str>,
+) -> Result<Document, Error> {
+    highlight(path, dark, None, fallback)
 }
 
 /// Read and highlight a text file, optionally naming its syntax.
@@ -253,6 +270,17 @@ pub fn load_with_syntax(
     path: &Path,
     dark: bool,
     syntax_name: Option<&str>,
+) -> Result<Document, Error> {
+    highlight(path, dark, syntax_name, None)
+}
+
+/// The shared reader: a named syntax wins, then the file's name, then the
+/// fallback, then the first line.
+fn highlight(
+    path: &Path,
+    dark: bool,
+    syntax_name: Option<&str>,
+    fallback: Option<&str>,
 ) -> Result<Document, Error> {
     let io = |source: std::io::Error| Error::Io {
         path: path.display().to_string(),
@@ -286,15 +314,17 @@ pub fn load_with_syntax(
     };
 
     let syntaxes = syntaxes();
+    let named = |name: &str| {
+        syntaxes
+            .find_syntax_by_name(name)
+            .or_else(|| syntaxes.find_syntax_by_token(name))
+    };
     // A named syntax is the caller's assertion and wins over the file name;
     // an unrecognised name falls through rather than losing the highlighting.
     let syntax = syntax_name
-        .and_then(|name| {
-            syntaxes
-                .find_syntax_by_name(name)
-                .or_else(|| syntaxes.find_syntax_by_token(name))
-        })
+        .and_then(named)
         .or_else(|| syntaxes.find_syntax_for_file(path).ok().flatten())
+        .or_else(|| fallback.and_then(named))
         // Falling back on the *content* rather than on plain text catches
         // extensionless scripts, where the shebang is the only clue there is.
         .or_else(|| syntaxes.find_syntax_by_first_line(content.lines().next().unwrap_or("")));

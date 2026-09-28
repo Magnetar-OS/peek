@@ -1,7 +1,13 @@
 # An example declarative plugin, not installed by default.
 #
-# Some formats are only unsupported because nothing tells peek they are text.
-# This is the whole fix: no code, no process, no decoder.
+# Some formats are only unsupported because nothing tells peek they are text,
+# or which syntax to highlight them with. This is the whole fix: no code, no
+# process, no decoder. A file that already reads as text is shown as text
+# either way; the rule adds the highlighting when peek knows no syntax for
+# the extension.
+#
+# Rules match extensions and MIME types, not whole file names: a file called
+# `justfile` has no extension for a rule to name.
 name = "Extra source formats"
 
 [[previewer]]
@@ -10,6 +16,6 @@ handler = "text"
 syntax = "Rust"
 
 [[previewer]]
-extensions = ["just", "justfile"]
+extensions = ["just"]
 handler = "text"
 syntax = "Makefile"
