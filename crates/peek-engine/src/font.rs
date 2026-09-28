@@ -26,6 +26,16 @@ pub struct FontSpecimen {
     pub family: String,
     /// Style name: "Bold Italic", "Display", whatever the designer wrote.
     pub style: Option<String>,
+    /// Weight class, 100 (thin) to 900 (black); 400 is regular.
+    ///
+    /// The style *name* is prose; these three are what a text renderer
+    /// selects a face by, so a frontend can draw the specimen in this face
+    /// rather than whichever member of the family it finds first.
+    pub weight: u16,
+    /// Width class, 1 (ultra-condensed) to 9 (ultra-expanded); 5 is normal.
+    pub stretch: u16,
+    /// Whether the face is italic or oblique.
+    pub italic: bool,
     pub version: Option<String>,
     pub glyphs: u16,
     /// Whether the file carries variation axes.
@@ -96,6 +106,9 @@ pub fn specimen(path: &Path) -> Result<FontSpecimen, Error> {
     Ok(FontSpecimen {
         family,
         style,
+        weight: face.weight().to_number(),
+        stretch: face.width().to_number(),
+        italic: face.is_italic() || face.is_oblique(),
         version: name(ttf_parser::name_id::VERSION),
         glyphs: face.number_of_glyphs(),
         variable: face.is_variable(),
@@ -146,6 +159,8 @@ mod tests {
 
         let specimen = specimen(&path).expect("parses");
         assert!(!specimen.family.is_empty(), "a family name was expected");
+        assert!((1..=1000).contains(&specimen.weight));
+        assert!((1..=9).contains(&specimen.stretch));
         assert!(specimen.glyphs > 0);
         assert!(specimen.faces >= 1);
         assert!(!specimen.data.is_empty());

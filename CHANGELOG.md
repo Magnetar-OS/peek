@@ -78,6 +78,10 @@ All notable changes to this project are documented here. The format follows
   through a symlinked folder, previews it and its real neighbours, the same
   as the command line. Before, a share's `smb://` URI was dropped and a
   symlinked path built the arrow-key neighbourhood around the link.
+- A font specimen is drawn in the face the file holds. Previewing
+  `Inter-Bold.ttf` after `Inter-Regular.ttf` drew the bold specimen in the
+  regular face, and previewing a font of the interface's own family could
+  change the overlay's own text.
 
 ## [2.1.0] - 2026-09-22
 
