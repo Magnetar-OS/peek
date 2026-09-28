@@ -50,6 +50,8 @@ All notable changes to this project are documented here. The format follows
 - Changing the accent colour or the frosted setting no longer restarts a
   playing video or re-decodes the file on screen. Switching between light
   and dark re-highlights source text, and nothing else.
+- Changing the largest panel size in the settings file re-renders the SVG
+  or page on screen, the way moving the slider in the panel already did.
 
 ## [2.1.0] - 2026-09-22
 

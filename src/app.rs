@@ -918,6 +918,29 @@ impl App {
         Task::batch([open_uri(&uri), self.dismiss()])
     }
 
+    /// Bring everything that follows from the settings in line with them.
+    ///
+    /// One function whether the change came from the panel or from the config
+    /// store, so a setting edited in the file behaves exactly like the same
+    /// setting moved in the panel.
+    fn settings_changed(&mut self, previous: &Config) -> Task<Message> {
+        self.panel.set_animated(self.config.animate);
+        self.release_previewer_if_unwanted();
+
+        // The panel's share of the display is what the vector and page render
+        // targets are derived from, so what was decoded under the old share —
+        // on screen and ahead of the arrow keys — is the wrong size now.
+        // Everything else changes how the preview is *drawn*, which the next
+        // frame handles on its own.
+        if (previous.fraction() - self.config.fraction()).abs() > f32::EPSILON {
+            self.preload.clear();
+            if self.surface.is_some() {
+                return Task::batch([self.reload(), self.refresh_blur()]);
+            }
+        }
+        self.refresh_blur()
+    }
+
     /// Give up `org.gnome.NautilusPreviewer` when the settings say to.
     ///
     /// The subscription that owns the connection stops with the setting, but
@@ -1045,10 +1068,10 @@ pub enum Nav {
 
 /// One change the settings panel can make.
 ///
-/// An enum rather than a closure per control so that [`Setting::apply`] and
-/// [`Setting::affects_decoding`] sit together: whether a setting invalidates
-/// decoded previews is a property of the setting, and keeping it beside the
-/// mutation is what stops the two drifting.
+/// An enum rather than a closure per control, so the panel's messages stay
+/// `Clone` and comparable. What a change *means* for the previews is decided
+/// by comparing the settings before and after (see `App::settings_changed`),
+/// the same way whether it came from here or from the config store.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Setting {
     Blur(bool),
@@ -1075,15 +1098,6 @@ impl Setting {
             Self::ClickAway(value) => config.click_away = value,
             Self::Animate(value) => config.animate = value,
         }
-    }
-
-    /// Whether changing this invalidates an already-decoded preview.
-    ///
-    /// Only the panel's share of the display does: it is what the vector and
-    /// page render targets are derived from. Everything else changes how the
-    /// preview is *drawn*, which the next frame handles on its own.
-    fn affects_decoding(self) -> bool {
-        matches!(self, Self::MaxFraction(_))
     }
 }
 
@@ -1508,21 +1522,10 @@ impl cosmic::Application for App {
             }
 
             Message::Setting(change) => {
+                let previous = self.config.clone();
                 change.apply(&mut self.config);
                 self.config.store();
-                self.panel.set_animated(self.config.animate);
-
-                // A setting that shapes a decode invalidates what was decoded
-                // under the old one — the same rule the config subscription
-                // applies when the change arrives from outside.
-                let redecode = change.affects_decoding();
-                self.preload.clear();
-
-                if redecode {
-                    Task::batch([self.reload(), self.refresh_blur()])
-                } else {
-                    self.refresh_blur()
-                }
+                self.settings_changed(&previous)
             }
 
             Message::CopyPath => {
@@ -1595,15 +1598,9 @@ impl cosmic::Application for App {
             }
 
             Message::ConfigChanged(config) => {
-                let blur_changed = config.blur != self.config.blur;
-                self.config = *config;
-                self.panel.set_animated(self.config.animate);
-                self.release_previewer_if_unwanted();
-                // The panel fraction shapes render targets, so cached decodes
-                // may describe the old settings.
-                self.preload.clear();
-                tracing::info!(blur_changed, "settings updated");
-                self.refresh_blur()
+                let previous = std::mem::replace(&mut self.config, *config);
+                tracing::info!("settings updated");
+                self.settings_changed(&previous)
             }
 
             Message::ThemeChanged => {
@@ -2086,6 +2083,28 @@ mod tests {
         let _ = app.update(Message::ThemeChanged);
         assert_ne!(app.generation, before, "the text is highlighted again");
         assert_eq!(app.dark, cosmic::theme::is_dark());
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_size_edited_in_the_config_store_re_renders_like_the_panel_does() {
+        let (mut app, path) = showing_text("peek-test-app-fraction.rs");
+        let before = app.generation;
+
+        // The same settings arriving again (the store echoing a panel edit)
+        // changes nothing.
+        let _ = app.update(Message::ConfigChanged(Box::new(Config::default())));
+        assert_eq!(app.generation, before);
+
+        let _ = app.update(Message::ConfigChanged(Box::new(Config {
+            max_fraction: 0.5,
+            ..Config::default()
+        })));
+        assert_ne!(
+            app.generation, before,
+            "the render targets follow the panel's share of the display"
+        );
 
         let _ = std::fs::remove_file(path);
     }
