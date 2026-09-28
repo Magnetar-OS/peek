@@ -97,39 +97,60 @@ pub fn list(path: &Path, mime: &str) -> Result<Archive, Error> {
 
         "application/x-7z-compressed" => seven_z(path),
 
-        "application/x-tar" => tar_stream(std::fs::File::open(path).map_err(io(path))?, "Tar"),
+        "application/x-tar" => tar_stream(open(path)?, "Tar"),
 
-        "application/x-compressed-tar" | "application/gzip" => {
-            let file = std::fs::File::open(path).map_err(io(path))?;
-            tar_stream(flate2::read::GzDecoder::new(file), "Tar (gzip)")
-        }
+        // The `*-compressed-tar` types name a tarball outright. The bare
+        // compression types are what magic sniffing answers for *any* file
+        // in that compression — it cannot tell `backup.tar.gz` from
+        // `access.log.gz` — so those are listed only when what they hold
+        // turns out to be a tar. See [`tar_if_tar`].
+        "application/x-compressed-tar" => tar_stream(gzip(path)?, GZIP),
+        "application/gzip" => tar_if_tar(gzip(path)?, GZIP),
 
-        "application/x-bzip-compressed-tar"
-        | "application/x-bzip2-compressed-tar"
-        | "application/x-bzip"
-        | "application/x-bzip2" => {
-            let file = std::fs::File::open(path).map_err(io(path))?;
-            tar_stream(bzip2::read::BzDecoder::new(file), "Tar (bzip2)")
+        "application/x-bzip-compressed-tar" | "application/x-bzip2-compressed-tar" => {
+            tar_stream(bzip2(path)?, BZIP2)
         }
+        "application/x-bzip" | "application/x-bzip2" => tar_if_tar(bzip2(path)?, BZIP2),
 
-        "application/x-xz-compressed-tar"
-        | "application/x-xz"
-        | "application/x-lzma-compressed-tar" => {
-            let file = std::fs::File::open(path).map_err(io(path))?;
-            tar_stream(
-                lzma_rust2::XzReader::new_mem_limit(file, true, DECODER_MEMORY_KIB),
-                "Tar (xz)",
-            )
+        "application/x-xz-compressed-tar" | "application/x-lzma-compressed-tar" => {
+            tar_stream(xz(path)?, XZ)
         }
+        "application/x-xz" => tar_if_tar(xz(path)?, XZ),
 
-        "application/x-zstd-compressed-tar" | "application/zstd" => {
-            let file = std::fs::File::open(path).map_err(io(path))?;
-            let decoder = zstd::stream::read::Decoder::new(file).map_err(io(path))?;
-            tar_stream(decoder, "Tar (zstd)")
-        }
+        "application/x-zstd-compressed-tar" => tar_stream(zstd(path)?, ZSTD),
+        "application/zstd" => tar_if_tar(zstd(path)?, ZSTD),
 
         _ => Err(Error::Unsupported),
     }
+}
+
+const GZIP: &str = "Tar (gzip)";
+const BZIP2: &str = "Tar (bzip2)";
+const XZ: &str = "Tar (xz)";
+const ZSTD: &str = "Tar (zstd)";
+
+fn open(path: &Path) -> Result<std::fs::File, Error> {
+    std::fs::File::open(path).map_err(io(path))
+}
+
+fn gzip(path: &Path) -> Result<impl Read, Error> {
+    Ok(flate2::read::GzDecoder::new(open(path)?))
+}
+
+fn bzip2(path: &Path) -> Result<impl Read, Error> {
+    Ok(bzip2::read::BzDecoder::new(open(path)?))
+}
+
+fn xz(path: &Path) -> Result<impl Read, Error> {
+    Ok(lzma_rust2::XzReader::new_mem_limit(
+        open(path)?,
+        true,
+        DECODER_MEMORY_KIB,
+    ))
+}
+
+fn zstd(path: &Path) -> Result<impl Read, Error> {
+    zstd::stream::read::Decoder::new(open(path)?).map_err(io(path))
 }
 
 fn io(path: &Path) -> impl Fn(std::io::Error) -> Error + '_ {
@@ -211,6 +232,57 @@ fn seven_z(path: &Path) -> Result<Archive, Error> {
         truncated: files.len() > MAX_ENTRIES,
         format: "7z".to_owned(),
     })
+}
+
+/// List a compressed stream if it holds a tar, and decline it otherwise.
+///
+/// Only the first block is decompressed to decide: a tar starts with a
+/// header whose checksum covers the block, which a log, a disk image or a
+/// database dump will not satisfy by accident. Declining is
+/// [`Error::Unsupported`], not damage — a gzipped log is a perfectly good
+/// file that simply is not an archive.
+fn tar_if_tar<R: Read>(mut reader: R, format: &str) -> Result<Archive, Error> {
+    let mut head = Vec::with_capacity(TAR_BLOCK);
+    (&mut reader)
+        .take(TAR_BLOCK as u64)
+        .read_to_end(&mut head)
+        .map_err(|error| Error::Damaged(error.to_string()))?;
+
+    if !is_tar_header(&head) {
+        return Err(Error::Unsupported);
+    }
+    tar_stream(std::io::Cursor::new(head).chain(reader), format)
+}
+
+/// Size of a tar header block.
+const TAR_BLOCK: usize = 512;
+
+/// Whether a block is a tar header: its stored checksum matches the sum of
+/// its bytes with the checksum field read as spaces. An all-zero block is the
+/// end-of-archive marker, which is how an empty tar begins.
+fn is_tar_header(block: &[u8]) -> bool {
+    let Some(block) = block.get(..TAR_BLOCK) else {
+        return false;
+    };
+    if block.iter().all(|&byte| byte == 0) {
+        return true;
+    }
+
+    let Ok(stored) = tar::Header::from_byte_slice(block).cksum() else {
+        return false;
+    };
+    let computed: u32 = block
+        .iter()
+        .enumerate()
+        .map(|(index, &byte)| {
+            if (148..156).contains(&index) {
+                u32::from(b' ')
+            } else {
+                u32::from(byte)
+            }
+        })
+        .sum();
+    stored == computed
 }
 
 /// List a tar stream, however it is compressed.
@@ -319,6 +391,58 @@ mod tests {
         let archive = tar_stream(std::io::Cursor::new(vec![0u8; 1024]), "Tar").expect("lists");
         assert!(archive.members.is_empty());
         assert!(!archive.truncated);
+    }
+
+    fn gzipped(name: &str, bytes: &[u8]) -> std::path::PathBuf {
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        std::io::Write::write_all(&mut encoder, bytes).expect("compress");
+        let path = std::env::temp_dir().join(name);
+        std::fs::write(&path, encoder.finish().expect("finish")).expect("write");
+        path
+    }
+
+    #[test]
+    fn a_compressed_file_that_is_not_a_tar_is_declined_not_damaged() {
+        // Magic says `application/gzip` for any gzip, so a compressed log
+        // arrives here too. It is not an archive, and it is not broken.
+        let path = gzipped(
+            "peek-test-archive-log.gz",
+            &b"GET / HTTP/1.1 200\n".repeat(64),
+        );
+        assert!(matches!(
+            list(&path, "application/gzip"),
+            Err(Error::Unsupported)
+        ));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_bare_gzip_holding_a_tar_is_listed() {
+        let mut tarball = tar::Builder::new(Vec::new());
+        let mut header = tar::Header::new_gnu();
+        header.set_size(2);
+        header.set_mode(0o644);
+        header.set_cksum();
+        tarball
+            .append_data(&mut header, "a.txt", &b"hi"[..])
+            .expect("append");
+        let path = gzipped(
+            "peek-test-archive-bare.gz",
+            &tarball.into_inner().expect("finish the tar"),
+        );
+
+        let archive = list(&path, "application/gzip").expect("lists");
+        assert_eq!(archive.members.len(), 1);
+        assert_eq!(archive.members[0].name, "a.txt");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn an_empty_compressed_tar_is_still_a_tar() {
+        let path = gzipped("peek-test-archive-empty.tar.gz", &[0u8; 1024]);
+        let archive = list(&path, "application/gzip").expect("lists");
+        assert!(archive.members.is_empty());
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

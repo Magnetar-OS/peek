@@ -110,16 +110,19 @@ const TEXTUAL: &[&str] = &[
     "image/x-xpixmap",
 ];
 
-/// Archive and compression MIME types.
+/// Archive and compression MIME types the archive previewer can list.
 ///
 /// Listed explicitly rather than matched on a prefix: `application/` is where
 /// almost everything unrecognised ends up, so a prefix rule would claim
 /// unrelated formats and show them as empty archives.
+///
+/// Only what [`crate::archive::list`] reads. RAR, ISO images, `.deb` and
+/// `.rpm` are archives too, but nothing here lists them, so claiming them
+/// would turn a perfectly good file into "could not be decoded" — and would
+/// keep a plugin that *can* read them from ever being asked.
 const ARCHIVES: &[&str] = &[
     "application/zip",
     "application/x-zip-compressed",
-    "application/vnd.rar",
-    "application/x-rar-compressed",
     "application/x-tar",
     "application/x-compressed-tar",
     "application/x-bzip-compressed-tar",
@@ -135,9 +138,6 @@ const ARCHIVES: &[&str] = &[
     "application/x-7z-compressed",
     "application/java-archive",
     "application/vnd.android.package-archive",
-    "application/x-cd-image",
-    "application/vnd.debian.binary-package",
-    "application/x-rpm",
 ];
 
 /// Extensions that mean Markdown.
@@ -588,6 +588,22 @@ mod tests {
         assert_eq!(
             classify("font/woff2", &PathBuf::from("a.woff2")),
             Kind::Other
+        );
+    }
+
+    #[test]
+    fn archives_nothing_lists_are_left_to_the_card_and_plugins() {
+        for mime in [
+            "application/vnd.rar",
+            "application/x-cd-image",
+            "application/vnd.debian.binary-package",
+            "application/x-rpm",
+        ] {
+            assert_eq!(classify(mime, &PathBuf::from("a")), Kind::Other, "{mime}");
+        }
+        assert_eq!(
+            classify("application/x-7z-compressed", &PathBuf::from("a.7z")),
+            Kind::Archive
         );
     }
 

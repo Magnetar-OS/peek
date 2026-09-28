@@ -256,10 +256,7 @@ pub fn load(entry: &Entry, options: Options) -> Preview {
             Err(error) => failed(reason_for_font(&error), error, card()),
         },
 
-        Kind::Archive => match crate::archive::list(&entry.path, &entry.mime) {
-            Ok(archive) => Preview::Archive(Box::new(archive)),
-            Err(error) => failed(reason_for_archive(&error), error, card()),
-        },
+        Kind::Archive => archive(entry, card),
 
         #[cfg(feature = "media")]
         Kind::Video | Kind::Audio => match crate::media::probe(&entry.path) {
@@ -320,10 +317,7 @@ fn plugin_preview(entry: &Entry, options: Options, card: impl Fn() -> Box<Card>)
             Ok(picture) => Preview::Picture(Box::new(picture)),
             Err(error) => failed(reason_for_picture(&error), error, card()),
         },
-        Handler::Archive => match crate::archive::list(&entry.path, &entry.mime) {
-            Ok(archive) => Preview::Archive(Box::new(archive)),
-            Err(error) => failed(reason_for_archive(&error), error, card()),
-        },
+        Handler::Archive => archive(entry, card),
         #[cfg(not(feature = "media"))]
         Handler::Media => Preview::Card(card()),
         #[cfg(feature = "media")]
@@ -419,11 +413,18 @@ fn reason_for_pdf(error: &crate::pdf::Error) -> Reason {
     }
 }
 
-fn reason_for_archive(error: &crate::archive::Error) -> Reason {
+/// List an archive, or describe the file when it is not one this reads.
+///
+/// A compressed log sniffs as the same `application/gzip` a tarball does, and
+/// declining it is not a failure: it gets the card any unlisted format gets,
+/// not "could not be decoded".
+fn archive(entry: &Entry, card: impl Fn() -> Box<Card>) -> Preview {
     use crate::archive::Error;
-    match error {
-        Error::Io { .. } => Reason::Unreadable,
-        Error::Unsupported | Error::Damaged(_) => Reason::Undecodable,
+    match crate::archive::list(&entry.path, &entry.mime) {
+        Ok(archive) => Preview::Archive(Box::new(archive)),
+        Err(Error::Unsupported) => Preview::Card(card()),
+        Err(error @ Error::Io { .. }) => failed(Reason::Unreadable, error, card()),
+        Err(error @ Error::Damaged(_)) => failed(Reason::Undecodable, error, card()),
     }
 }
 
@@ -506,6 +507,28 @@ mod tests {
         let entry = Entry::load(&path).expect("stats");
 
         assert!(matches!(load(&entry, Options::default()), Preview::Card(_)));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_compressed_log_is_described_not_reported_as_damaged() {
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        encoder
+            .write_all(&b"2026-09-29 12:00:00 started\n".repeat(32))
+            .expect("compress");
+        let path = write(
+            "peek-test-preview-access.log.gz",
+            &encoder.finish().expect("finish"),
+        );
+        let entry = Entry::load(&path).expect("stats");
+        assert_eq!(entry.kind, Kind::Archive, "magic says gzip");
+
+        let preview = load(&entry, Options::default());
+        assert!(
+            matches!(preview, Preview::Card(_)),
+            "expected the plain card, got {preview:?}"
+        );
 
         let _ = std::fs::remove_file(path);
     }

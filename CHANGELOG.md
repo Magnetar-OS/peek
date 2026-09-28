@@ -37,6 +37,10 @@ All notable changes to this project are documented here. The format follows
   per processor core at a time. Before, every cell (up to 250) started
   decoding at once, which could hold gigabytes of image buffers in a camera
   folder.
+- A compressed file that is not a tarball (`access.log.gz`, a `.xz` disk
+  image) shows its details instead of "The file could not be decoded", and
+  so do RAR, ISO, `.deb` and `.rpm` files, which Peek does not list. Those
+  four can now be claimed by a plugin.
 
 ## [2.1.0] - 2026-09-22
 
