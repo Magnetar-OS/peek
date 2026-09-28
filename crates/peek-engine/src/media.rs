@@ -88,8 +88,6 @@ pub enum Error {
     Pipeline(String),
     #[error("could not read {0}")]
     Uri(String),
-    #[error("nothing in this file could be decoded")]
-    Undecodable,
 }
 
 /// Initialise GStreamer exactly once.

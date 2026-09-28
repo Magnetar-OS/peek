@@ -86,8 +86,6 @@ pub enum Reason {
     TooLarge,
     /// The file decoded, but to nothing worth showing.
     Empty,
-    /// Nothing on this system can decode the streams it holds.
-    NoCodec,
     /// The container carries no embedded preview to extract.
     NoPreview,
     /// The file was deleted or moved after it was selected.
@@ -468,7 +466,6 @@ fn reason_for_media(error: &crate::media::Error) -> Reason {
     use crate::media::Error;
     match error {
         Error::Uri(_) => Reason::Unreadable,
-        Error::Undecodable => Reason::NoCodec,
         Error::Init(_) | Error::Pipeline(_) => Reason::Undecodable,
     }
 }

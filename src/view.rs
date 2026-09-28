@@ -215,9 +215,6 @@ fn reason_text(reason: Reason) -> String {
         Reason::Encrypted => fl!("reason-encrypted"),
         Reason::TooLarge => fl!("reason-too-large"),
         Reason::Empty => fl!("reason-empty"),
-        // The same fact the media panel states for a probed file with no
-        // usable streams, so it uses the same words.
-        Reason::NoCodec => fl!("no-codec"),
         Reason::NoPreview => fl!("reason-no-preview"),
         Reason::Missing => fl!("reason-missing"),
     }
@@ -1594,7 +1591,6 @@ mod tests {
             Reason::Encrypted,
             Reason::TooLarge,
             Reason::Empty,
-            Reason::NoCodec,
             Reason::NoPreview,
             Reason::Missing,
         ] {
