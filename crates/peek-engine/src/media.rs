@@ -52,6 +52,13 @@ const PREROLL_TIMEOUT: gst::ClockTime = gst::ClockTime::from_seconds(5);
 /// Longest edge a poster frame is scaled to.
 const POSTER_EDGE: u32 = 1600;
 
+/// Longest edge a playback frame is handed over at.
+///
+/// The largest texture edge a GPU is guaranteed to accept (wgpu's default
+/// `max_texture_dimension_2d`). 8K video fits; anything larger is scaled to
+/// it in the pipeline rather than dropped at the upload.
+const FRAME_EDGE: u32 = 8192;
+
 /// What a media file says about itself.
 #[derive(Debug, Clone, Default)]
 pub struct Media {
@@ -449,11 +456,17 @@ impl Player {
 
         pipeline.set_property("uri", &uri);
 
+        // A size *range* rather than a size: `videoscale` passes a frame that
+        // fits through untouched and brings one that does not down to fit,
+        // keeping its display aspect ratio.
+        let edge = gst::IntRange::new(1, i32::try_from(FRAME_EDGE).unwrap_or(i32::MAX));
         let sink = gst_app::AppSink::builder()
             .caps(
                 &gst::Caps::builder("video/x-raw")
                     .field("format", "RGBA")
                     .field("pixel-aspect-ratio", gst::Fraction::new(1, 1))
+                    .field("width", edge)
+                    .field("height", edge)
                     .build(),
             )
             // One buffer, dropping the rest. The overlay draws at display rate
@@ -465,15 +478,19 @@ impl Player {
 
         // `videoconvert` in front of the sink because a decoder is free to
         // produce any format it likes, and the caps above would otherwise fail
-        // to link rather than being negotiated into.
+        // to link rather than being negotiated into; `videoscale` for the
+        // same reason about size.
         let bin = gst::Bin::builder().name("peek-video-sink").build();
         let convert = gst::ElementFactory::make("videoconvert")
             .build()
             .map_err(|error| Error::Pipeline(error.to_string()))?;
-
-        bin.add_many([&convert, sink.upcast_ref::<gst::Element>()])
+        let scale = gst::ElementFactory::make("videoscale")
+            .build()
             .map_err(|error| Error::Pipeline(error.to_string()))?;
-        gst::Element::link_many([&convert, sink.upcast_ref::<gst::Element>()])
+
+        bin.add_many([&convert, &scale, sink.upcast_ref::<gst::Element>()])
+            .map_err(|error| Error::Pipeline(error.to_string()))?;
+        gst::Element::link_many([&convert, &scale, sink.upcast_ref::<gst::Element>()])
             .map_err(|error| Error::Pipeline(error.to_string()))?;
 
         let pad = convert
@@ -570,7 +587,7 @@ impl Player {
         // path, so blocking here would stall the whole overlay behind the
         // decoder.
         let sample = self.sink.try_pull_sample(gst::ClockTime::ZERO)?;
-        sample_to_raster(&sample, POSTER_EDGE * 4)
+        sample_to_raster(&sample, FRAME_EDGE)
     }
 
     /// Whether playback has reached the end of the file.
@@ -652,6 +669,20 @@ mod tests {
         // A PAR the container left unset is read as square.
         assert_eq!(poster_size(640, 480, (0, 1)), Some(PosterSize::Width(640)));
         assert_eq!(poster_size(0, 480, (1, 1)), None);
+    }
+
+    #[test]
+    fn an_8k_frame_is_handed_over_for_playback() {
+        init().expect("GStreamer starts");
+        let info = gst_video::VideoInfo::builder(gst_video::VideoFormat::Rgba, 7680, 2)
+            .build()
+            .expect("video info");
+        let buffer = gst::Buffer::from_mut_slice(vec![0u8; info.size()]);
+        let caps = info.to_caps().expect("caps");
+        let sample = gst::Sample::builder().buffer(&buffer).caps(&caps).build();
+
+        let raster = sample_to_raster(&sample, FRAME_EDGE).expect("an 8K frame fits a texture");
+        assert_eq!((raster.width, raster.height), (7680, 2));
     }
 
     #[test]

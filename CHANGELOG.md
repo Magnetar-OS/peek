@@ -65,6 +65,9 @@ All notable changes to this project are documented here. The format follows
 - Matroska files preview and play. `.mkv` and `.mka` were detected as
   `application/x-matroska`, which nothing claimed, so they showed only the
   metadata card.
+- 8K video plays. Playback frames wider than 6400 pixels were dropped, so
+  the panel stayed on the poster; frames now pass up to the GPU's 8192-pixel
+  texture limit, and anything larger is scaled to it.
 
 ## [2.1.0] - 2026-09-22
 
