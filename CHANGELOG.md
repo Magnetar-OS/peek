@@ -19,6 +19,8 @@ All notable changes to this project are documented here. The format follows
   or `%i`; the placeholders are no longer substituted inside the file name.
 - Word documents with custom tab stops no longer preview with stray tabs at
   the start of each paragraph.
+- Text and Markdown files over 4 MB are no longer reported as containing
+  invalid text when the preview limit falls inside a multi-byte character.
 
 ## [2.1.0] - 2026-09-22
 

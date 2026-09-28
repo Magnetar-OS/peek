@@ -272,7 +272,7 @@ pub fn load_with_syntax(
     let over_bytes = bytes_read > MAX_BYTES;
     buffer.truncate(MAX_BYTES);
 
-    let lossy = std::str::from_utf8(&buffer).is_err();
+    let lossy = trim_cut_character(&mut buffer, over_bytes);
     let content = String::from_utf8_lossy(&buffer);
     // A byte-bounded read almost always cuts mid-line. Dropping the partial
     // tail is better than highlighting half a token as if it were whole.
@@ -372,6 +372,25 @@ pub fn load_with_syntax(
     })
 }
 
+/// Drop a character the read ceiling cut in half, and report whether what
+/// remains is not UTF-8.
+///
+/// A read bounded at [`MAX_BYTES`] can stop partway through a multi-byte
+/// character. That partial tail is an artefact of the bound, not of the file,
+/// so it is removed rather than counted against the file — otherwise every
+/// non-ASCII file over the ceiling would be reported as containing bytes that
+/// are not text. Any other invalid sequence still flags the document.
+pub(crate) fn trim_cut_character(buffer: &mut Vec<u8>, cut: bool) -> bool {
+    match std::str::from_utf8(buffer) {
+        Ok(_) => false,
+        Err(error) if cut && error.error_len().is_none() => {
+            buffer.truncate(error.valid_up_to());
+            false
+        }
+        Err(_) => true,
+    }
+}
+
 /// A single unhighlighted line.
 pub(crate) fn plain_line(text: &str) -> Line {
     Line {
@@ -465,6 +484,31 @@ mod tests {
         let document = load(&path, true).expect("loads");
         assert!(document.lossy);
         assert!(!document.lines.is_empty());
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_long_file_cut_mid_character_is_not_lossy() {
+        // One ASCII byte, then two-byte characters: the read ceiling (an even
+        // offset) lands between the halves of one of them. The file is valid
+        // UTF-8; only the bound cut it, so it must not be reported as
+        // containing bytes that are not text.
+        let path = std::env::temp_dir().join("peek-test-long.unknownext");
+        let mut content = String::from("x");
+        content.push_str(&"é".repeat(MAX_BYTES / 2 + 16));
+        std::fs::write(&path, content.as_bytes()).expect("write");
+        assert!(
+            !content.is_char_boundary(MAX_BYTES),
+            "the fixture must cut a character"
+        );
+
+        let document = load(&path, true).expect("loads");
+        assert!(document.truncated);
+        assert!(
+            !document.lossy,
+            "a valid file cut by the bound is not lossy"
+        );
 
         let _ = std::fs::remove_file(path);
     }

@@ -86,7 +86,7 @@ pub fn render(path: &Path, dark: bool) -> Result<Document, Error> {
     let over_bytes = bytes_read > MAX_BYTES;
     buffer.truncate(MAX_BYTES);
 
-    let lossy = std::str::from_utf8(&buffer).is_err();
+    let lossy = crate::text::trim_cut_character(&mut buffer, over_bytes);
     let source = String::from_utf8_lossy(&buffer);
 
     let mut document = render_str(&source, dark);
