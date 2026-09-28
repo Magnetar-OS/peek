@@ -16,7 +16,7 @@
 # which is the one property that makes read-only host access defensible.
 app-id: com.magnetaros.Peek
 runtime: org.freedesktop.Platform
-runtime-version: '25.08'
+runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
@@ -59,11 +59,9 @@ modules:
       - -DENABLE_UTILS=OFF
     sources:
       - type: archive
-        url: https://poppler.freedesktop.org/poppler-25.08.0.tar.xz
-        sha256: 0e42e6a6a0e6a8bbb0e6d4ee9f0e64a0e7e0e0a0e0a0e0a0e0a0e0a0e0a0e0a0
-        # TODO: replace with the real checksum before this manifest is
-        # submitted anywhere. Left obviously wrong rather than plausibly
-        # wrong, so it cannot be mistaken for verified.
+        url: https://poppler.freedesktop.org/poppler-26.08.0.tar.xz
+        # Computed from the release tarball downloaded on 2026-09-29.
+        sha256: dc906e68cea698109706ac6aa3d2c9d4512fcfcac42d90b8afcda486d1b9abd0
 
   - name: peek
     buildsystem: simple
@@ -82,6 +80,6 @@ modules:
     sources:
       - type: dir
         path: ../..
-      # `flatpak-cargo-generator.py` produces this from Cargo.lock; it is not
-      # checked in because it is generated and enormous.
+      # Generated from Cargo.lock by `just flatpak-sources`; not checked in
+      # because it is generated and enormous. See README.md beside this file.
       - generated-sources.json

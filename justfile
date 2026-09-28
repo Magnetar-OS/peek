@@ -162,6 +162,16 @@ vendor-extract:
     rm -rf vendor
     tar pxf vendor.tar
 
+# The generator is fetched at a pinned commit and run through uv, which
+# resolves the script's own declared dependencies (aiohttp, tomlkit).
+
+# Generate the Flatpak manifest's offline crate sources from Cargo.lock
+flatpak-sources:
+    curl -sSfL -o packaging/flatpak/flatpak-cargo-generator.py \
+        https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/41c20aa10819cdb2a4f3ca171758a96d1955c018/cargo/flatpak-cargo-generator.py
+    uv run packaging/flatpak/flatpak-cargo-generator.py Cargo.lock \
+        -o packaging/flatpak/generated-sources.json
+
 # Validate the desktop entry and the AppStream metadata
 validate:
     -desktop-file-validate res/{{desktop}}
