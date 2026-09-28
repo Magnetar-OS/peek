@@ -27,6 +27,10 @@ All notable changes to this project are documented here. The format follows
 - Arrowing onto a file that was deleted after it was selected stops the
   previous file's audio or video and says the file no longer exists, under
   its name, instead of showing an empty card while the old track plays on.
+- Opening the index sheet on a large folder decodes at most one thumbnail
+  per processor core at a time. Before, every cell (up to 250) started
+  decoding at once, which could hold gigabytes of image buffers in a camera
+  folder.
 
 ## [2.1.0] - 2026-09-22
 

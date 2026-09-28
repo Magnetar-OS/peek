@@ -298,6 +298,13 @@ pub struct App {
     thumbnails: HashMap<PathBuf, Option<image::Handle>>,
     /// Thumbnails currently rendering, so a redraw does not start them twice.
     thumbnails_inflight: HashSet<PathBuf>,
+    /// How many index-sheet cells may decode at once.
+    ///
+    /// Every cell is *scheduled* when the sheet opens, but each one is a full
+    /// decode — a camera JPEG is close to a hundred megabytes of RGBA before
+    /// it is reduced — so running all of them together would hold gigabytes
+    /// and hundreds of threads for a grid of quarter-megabyte thumbnails.
+    thumbnail_permits: std::sync::Arc<tokio::sync::Semaphore>,
 
     /// Whether the content is shown against the whole output.
     ///
@@ -384,6 +391,9 @@ impl App {
             grid_index: 0,
             thumbnails: HashMap::new(),
             thumbnails_inflight: HashSet::new(),
+            thumbnail_permits: std::sync::Arc::new(tokio::sync::Semaphore::new(
+                thumbnail_concurrency(),
+            )),
             fullscreen: false,
             player: None,
             pending_frames: 0,
@@ -710,19 +720,23 @@ impl App {
         let mut tasks = Vec::with_capacity(wanted.len());
         for path in wanted {
             self.thumbnails_inflight.insert(path.clone());
+            let permits = std::sync::Arc::clone(&self.thumbnail_permits);
             tasks.push(Task::future(async move {
-                let rendered = {
+                let decoded = {
                     let path = path.clone();
-                    tokio::task::spawn_blocking(move || {
+                    run_bounded(permits, move || {
                         Entry::load(&path)
                             .and_then(|entry| peek_engine::thumbnail::render(&entry, edge))
                     })
                     .await
-                    .unwrap_or_else(|error| {
-                        tracing::error!(%error, "a thumbnail thread panicked");
-                        None
-                    })
                 };
+                let Some(decoded) = decoded else {
+                    return cosmic::action::app(Message::None);
+                };
+                let rendered = decoded.unwrap_or_else(|error| {
+                    tracing::error!(%error, "a thumbnail thread panicked");
+                    None
+                });
 
                 cosmic::action::app(Message::Thumbnail {
                     path,
@@ -1066,6 +1080,32 @@ impl Setting {
     fn affects_decoding(self) -> bool {
         matches!(self, Self::MaxFraction(_))
     }
+}
+
+/// Index-sheet decodes that may run at once: one per core, so the sheet
+/// fills as fast as the machine allows and no faster than it can.
+fn thumbnail_concurrency() -> usize {
+    std::thread::available_parallelism().map_or(2, std::num::NonZero::get)
+}
+
+/// Run blocking work on the blocking pool once `permits` has room for it.
+///
+/// The permit is held until the work finishes, so the semaphore bounds how
+/// many run at once however many are waiting. `None` when the permits were
+/// closed before this one's turn came: whatever wanted the result is gone,
+/// and the work is skipped rather than done for nobody.
+async fn run_bounded<T: Send + 'static>(
+    permits: std::sync::Arc<tokio::sync::Semaphore>,
+    work: impl FnOnce() -> T + Send + 'static,
+) -> Option<Result<T, tokio::task::JoinError>> {
+    let permit = permits.acquire_owned().await.ok()?;
+    Some(
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            work()
+        })
+        .await,
+    )
 }
 
 /// Number of pages a preview has, for bounding page navigation.
@@ -1946,6 +1986,38 @@ mod tests {
     /// core, and settings that never touch the user's config store.
     fn app(config: Config) -> App {
         App::new(Core::default(), config)
+    }
+
+    #[tokio::test]
+    async fn bounded_work_never_runs_more_than_its_permits_at_once() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let permits = Arc::new(tokio::sync::Semaphore::new(2));
+        let running = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+
+        let jobs = (0..8).map(|_| {
+            let (running, peak) = (Arc::clone(&running), Arc::clone(&peak));
+            run_bounded(Arc::clone(&permits), move || {
+                let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(now, Ordering::SeqCst);
+                std::thread::sleep(Duration::from_millis(20));
+                running.fetch_sub(1, Ordering::SeqCst);
+            })
+        });
+        let finished = cosmic::iced::futures::future::join_all(jobs).await;
+
+        assert_eq!(finished.iter().filter(|job| job.is_some()).count(), 8);
+        assert!(peak.load(Ordering::SeqCst) <= 2, "at most two ran together");
+    }
+
+    #[tokio::test]
+    async fn bounded_work_is_skipped_once_its_permits_are_closed() {
+        let permits = std::sync::Arc::new(tokio::sync::Semaphore::new(1));
+        permits.close();
+        let ran = run_bounded(permits, || true).await;
+        assert!(ran.is_none(), "nobody is waiting for the result");
     }
 
     #[test]
