@@ -15,6 +15,8 @@ All notable changes to this project are documented here. The format follows
 - The index sheet (<kbd>G</kbd>) is drawn in the same column the arrow keys
   and the backdrop blur assume, so <kbd>↑</kbd>/<kbd>↓</kbd> move by one
   visible row.
+- A command plugin receives the right file when its name contains `%o`, `%s`
+  or `%i`; the placeholders are no longer substituted inside the file name.
 
 ## [2.1.0] - 2026-09-22
 

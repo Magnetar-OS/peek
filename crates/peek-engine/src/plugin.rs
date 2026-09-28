@@ -445,11 +445,30 @@ impl Drop for Product {
 }
 
 /// Replace the placeholders in one argument.
+///
+/// One left-to-right pass over the *template*: substituted text is never
+/// scanned again, so a file named `100%own.blend` reaches the plugin as that
+/// file rather than with the output path spliced into its name. A `%` not
+/// followed by a known placeholder letter is kept as written.
 fn substitute(argument: &str, input: &Path, output: &Path, size: u32) -> String {
-    argument
-        .replace("%i", &input.display().to_string())
-        .replace("%o", &output.display().to_string())
-        .replace("%s", &size.to_string())
+    let mut result = String::with_capacity(argument.len());
+    let mut characters = argument.chars().peekable();
+
+    while let Some(character) = characters.next() {
+        let replacement = match (character, characters.peek()) {
+            ('%', Some('i')) => input.display().to_string(),
+            ('%', Some('o')) => output.display().to_string(),
+            ('%', Some('s')) => size.to_string(),
+            _ => {
+                result.push(character);
+                continue;
+            }
+        };
+        characters.next();
+        result.push_str(&replacement);
+    }
+
+    result
 }
 
 /// Split a command line into arguments, honouring quotes.
@@ -617,6 +636,23 @@ mod tests {
         assert_eq!(
             substitute("%i:%o:%s", Path::new("/in"), Path::new("/out"), 512),
             "/in:/out:512"
+        );
+    }
+
+    #[test]
+    fn a_placeholder_inside_a_substituted_path_is_left_alone() {
+        // Substituted text is data: a file whose name happens to contain
+        // `%o` or `%s` must reach the plugin as that file, not as a splice
+        // of the output path or the size into its name.
+        let input = Path::new("/tmp/100%own %s %i.blend");
+        assert_eq!(
+            substitute("%i", input, Path::new("/out"), 256),
+            "/tmp/100%own %s %i.blend"
+        );
+        // Unknown sequences in the template pass through untouched.
+        assert_eq!(
+            substitute("--q=90% %s", input, Path::new("/out"), 256),
+            "--q=90% 256"
         );
     }
 
