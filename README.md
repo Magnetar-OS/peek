@@ -297,6 +297,7 @@ src/                   the COSMIC frontend
   view.rs              rendering, and every user-visible string
   localize.rs          Fluent catalogues and the `fl!` macro
   previewer.rs         org.gnome.NautilusPreviewer2
+  keys.rs              the key bindings, read by the handler and by --help
   app.rs               state and update loop
 ```
 
