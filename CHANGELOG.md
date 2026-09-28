@@ -58,6 +58,10 @@ All notable changes to this project are documented here. The format follows
   and dark re-highlights source text, and nothing else.
 - Changing the largest panel size in the settings file re-renders the SVG
   or page on screen, the way moving the slider in the panel already did.
+- Video posters are scaled to at most 1600 pixels on their longer edge, as
+  intended: a 4K video's poster was the full 33 MB frame and an 8K video had
+  none. Anamorphic video (a DVD's 720 stored columns shown at 16:9) gets a
+  poster in its displayed shape.
 
 ## [2.1.0] - 2026-09-22
 

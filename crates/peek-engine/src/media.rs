@@ -50,7 +50,7 @@ const POSTER_POSITION: f64 = 0.15;
 const PREROLL_TIMEOUT: gst::ClockTime = gst::ClockTime::from_seconds(5);
 
 /// Longest edge a poster frame is scaled to.
-const POSTER_EDGE: i32 = 1600;
+const POSTER_EDGE: u32 = 1600;
 
 /// What a media file says about itself.
 #[derive(Debug, Clone, Default)]
@@ -134,10 +134,19 @@ pub fn probe(path: &Path) -> Result<Media, Error> {
         .duration()
         .map(|clock| Duration::from_nanos(clock.nseconds()));
 
+    // The stream the poster is taken from: the largest, as it is displayed.
+    let mut poster_from: Option<(u32, u32, gst::Fraction)> = None;
+
     for stream in info.video_streams() {
         media.has_video = true;
         media.width = media.width.max(stream.width());
         media.height = media.height.max(stream.height());
+        if poster_from.is_none_or(|(width, height, _)| {
+            u64::from(stream.width()) * u64::from(stream.height())
+                > u64::from(width) * u64::from(height)
+        }) {
+            poster_from = Some((stream.width(), stream.height(), stream.par()));
+        }
 
         let mut description = codec_name(stream.upcast_ref());
         if stream.width() > 0 {
@@ -171,8 +180,11 @@ pub fn probe(path: &Path) -> Result<Media, Error> {
 
     // Cover art from the tags is preferred over a decoded frame for audio; for
     // video there is no cover, so a frame is the only option.
-    if media.poster.is_none() && media.has_video {
-        media.poster = poster(&uri, media.duration);
+    if media.poster.is_none()
+        && let Some((width, height, par)) = poster_from
+        && let Some(size) = poster_size(width, height, (par.numer(), par.denom()))
+    {
+        media.poster = poster(&uri, media.duration, size);
     }
 
     Ok(media)
@@ -190,18 +202,61 @@ fn codec_name(stream: &gstreamer_pbutils::DiscovererStreamInfo) -> String {
         .unwrap_or_else(|| "Unknown codec".to_owned())
 }
 
+/// Which edge of a poster is fixed, and to what: the displayed frame's
+/// longer edge, reduced to [`POSTER_EDGE`] and never enlarged.
+///
+/// Only one edge is given to the pipeline. `videoscale` derives the other
+/// from the display aspect ratio, so an anamorphic stream is neither
+/// stretched nor letterboxed — which fixing both edges to rounded numbers
+/// would do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PosterSize {
+    Width(u32),
+    Height(u32),
+}
+
+/// The poster size for a video stream of `width` × `height` stored pixels
+/// with pixel aspect ratio `par` (numerator, denominator).
+fn poster_size(width: u32, height: u32, par: (i32, i32)) -> Option<PosterSize> {
+    if width == 0 || height == 0 {
+        return None;
+    }
+    // Stored pixels are not always square: a DVD's 720 stored columns are
+    // shown 853 wide. The poster is judged by the frame as it is displayed.
+    let displayed_width = match par {
+        (numerator, denominator) if numerator > 0 && denominator > 0 => {
+            u64::from(width) * u64::from(numerator.unsigned_abs())
+                / u64::from(denominator.unsigned_abs())
+        }
+        _ => u64::from(width),
+    }
+    .max(1);
+
+    let edge = u64::from(POSTER_EDGE);
+    Some(if displayed_width >= u64::from(height) {
+        PosterSize::Width(u32::try_from(displayed_width.min(edge)).unwrap_or(POSTER_EDGE))
+    } else {
+        PosterSize::Height(height.min(POSTER_EDGE))
+    })
+}
+
 /// Decode a single frame to use as a poster.
 ///
 /// Runs the pipeline only as far as `Paused`, which decodes exactly one frame —
 /// the preroll — and stops. Returns `None` on any failure: a video with no
 /// poster still previews as a video, so nothing here is worth surfacing as an
 /// error.
-fn poster(uri: &str, duration: Option<Duration>) -> Option<Raster> {
+fn poster(uri: &str, duration: Option<Duration>, size: PosterSize) -> Option<Raster> {
     // `videoconvert` handles whatever the decoder produces; `videoscale`
-    // bounds it so a 4K frame does not become a 33 MB texture for a thumbnail.
+    // brings it down to the poster's size, so a 4K frame does not become a
+    // 33 MB texture for a thumbnail and an 8K one still gets a poster.
+    let edge = match size {
+        PosterSize::Width(width) => format!("width={width}"),
+        PosterSize::Height(height) => format!("height={height}"),
+    };
     let description = format!(
         "uridecodebin uri=\"{uri}\" ! videoconvert ! videoscale ! \
-         video/x-raw,format=RGBA,pixel-aspect-ratio=1/1 ! \
+         video/x-raw,format=RGBA,pixel-aspect-ratio=1/1,{edge} ! \
          appsink name=poster max-buffers=1 drop=false sync=false"
     );
 
@@ -215,9 +270,6 @@ fn poster(uri: &str, duration: Option<Duration>) -> Option<Raster> {
         .downcast::<gst_app::AppSink>()
         .ok()?;
 
-    // Bound the frame here as well as in the caps: `videoscale` needs a target,
-    // and expressing it as a caps filter would force an exact size rather than
-    // a ceiling.
     if pipeline.set_state(gst::State::Paused).is_err() {
         return None;
     }
@@ -258,10 +310,10 @@ fn poster(uri: &str, duration: Option<Duration>) -> Option<Raster> {
 /// so a 1023-pixel-wide frame has padding at the end of every line that must
 /// not be copied into a tightly-packed buffer.
 ///
-/// `max_edge` bounds the result; frames larger than it are dropped rather than
-/// scaled, because the pipeline is where scaling belongs and doing it twice
-/// would soften the image for nothing.
-fn sample_to_raster(sample: &gst::Sample, max_edge: i32) -> Option<Raster> {
+/// `max_edge` bounds the result's longer edge; frames larger than it are
+/// dropped rather than scaled, because the pipeline is where scaling belongs
+/// and doing it twice would soften the image for nothing.
+fn sample_to_raster(sample: &gst::Sample, max_edge: u32) -> Option<Raster> {
     let caps = sample.caps()?;
     let info = gst_video::VideoInfo::from_caps(caps).ok()?;
     let buffer = sample.buffer()?;
@@ -269,7 +321,7 @@ fn sample_to_raster(sample: &gst::Sample, max_edge: i32) -> Option<Raster> {
 
     let width = frame.width();
     let height = frame.height();
-    if width == 0 || height == 0 || width > max_edge as u32 * 4 {
+    if width == 0 || height == 0 || width.max(height) > max_edge {
         return None;
     }
 
@@ -342,7 +394,7 @@ pub fn cover_art(path: &Path) -> Option<Raster> {
     let picture = tag.pictures().first()?;
 
     let decoded = image::load_from_memory(picture.data()).ok()?;
-    let reduced = crate::picture::reduce(decoded, POSTER_EDGE as u32);
+    let reduced = crate::picture::reduce(decoded, POSTER_EDGE);
     Raster::new(reduced.width(), reduced.height(), reduced.into_raw())
 }
 
@@ -571,6 +623,35 @@ mod tests {
         }
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_poster_fits_its_longer_displayed_edge_and_is_never_enlarged() {
+        // 4K and 8K both come down to the poster size; the 8K one used to be
+        // rejected outright.
+        assert_eq!(
+            poster_size(3840, 2160, (1, 1)),
+            Some(PosterSize::Width(1600))
+        );
+        assert_eq!(
+            poster_size(7680, 4320, (1, 1)),
+            Some(PosterSize::Width(1600))
+        );
+        // Portrait fixes the height.
+        assert_eq!(
+            poster_size(1080, 1920, (1, 1)),
+            Some(PosterSize::Height(1600))
+        );
+        // Small video keeps its own size.
+        assert_eq!(poster_size(640, 480, (1, 1)), Some(PosterSize::Width(640)));
+        // Anamorphic: 720 stored columns shown at 16:9 are 853 wide.
+        assert_eq!(
+            poster_size(720, 480, (32, 27)),
+            Some(PosterSize::Width(853))
+        );
+        // A PAR the container left unset is read as square.
+        assert_eq!(poster_size(640, 480, (0, 1)), Some(PosterSize::Width(640)));
+        assert_eq!(poster_size(0, 480, (1, 1)), None);
     }
 
     #[test]
