@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The settings panel has a switch for answering the space bar in Nautilus
+  (`nautilus_previewer`), which could only be set by editing the config
+  file.
+
 ### Changed
 
 - `.tar.xz` archives are listed by a pure-Rust decoder, so the packages no

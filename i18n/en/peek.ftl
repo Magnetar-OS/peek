@@ -28,6 +28,7 @@ setting-autoplay = Play media automatically
 setting-loop = Repeat media
 setting-follow-selection = Move the file manager's selection
 setting-click-away = Click outside to close
+setting-nautilus-previewer = Answer the space bar in Nautilus
 autoplay-always = Always
 autoplay-video-only = Video only
 autoplay-never = Never

@@ -1013,6 +1013,11 @@ fn settings_body<'a>(config: &Config, alpha: f32) -> Element<'a, Message> {
             fl!("setting-click-away"),
             config.click_away,
             Setting::ClickAway,
+        ))
+        .add(toggle(
+            fl!("setting-nautilus-previewer"),
+            config.nautilus_previewer,
+            Setting::NautilusPreviewer,
         ));
 
     let _ = alpha;

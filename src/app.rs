@@ -1083,6 +1083,7 @@ pub enum Setting {
     FollowSelection(bool),
     ClickAway(bool),
     Animate(bool),
+    NautilusPreviewer(bool),
 }
 
 impl Setting {
@@ -1097,6 +1098,7 @@ impl Setting {
             Self::FollowSelection(value) => config.follow_selection = value,
             Self::ClickAway(value) => config.click_away = value,
             Self::Animate(value) => config.animate = value,
+            Self::NautilusPreviewer(value) => config.nautilus_previewer = value,
         }
     }
 }
@@ -2226,6 +2228,13 @@ mod tests {
             "a photo decodes to the same pixels at any scale"
         );
         assert!(!rendered_for_display(&Preview::Text(Box::default())));
+    }
+
+    #[test]
+    fn the_panel_can_turn_the_file_manager_interface_off() {
+        let mut config = Config::default();
+        Setting::NautilusPreviewer(false).apply(&mut config);
+        assert!(!config.nautilus_previewer);
     }
 
     #[test]
