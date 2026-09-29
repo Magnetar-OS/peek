@@ -129,7 +129,15 @@ pub enum Message {
     /// A decode finished. Dropped unless `generation` is still current.
     Loaded {
         generation: u64,
+        /// The file as it was stat'd for this load; `None` when it is gone.
+        entry: Option<Box<Entry>>,
         preview: Box<Preview>,
+    },
+    /// The directory around a single shown file was listed.
+    Listed {
+        /// Dropped unless still the latest listing asked for.
+        listing: u64,
+        around: Neighbourhood,
     },
     /// A playback pipeline came up for the current file.
     PlayerReady {
@@ -140,6 +148,7 @@ pub enum Message {
     Preloaded {
         key: PreloadKey,
         path: PathBuf,
+        entry: Option<Box<Entry>>,
         preview: Box<Preview>,
     },
     /// Move through the neighbourhood by a signed offset.
@@ -263,7 +272,7 @@ pub struct App {
     /// were decoded under still hold — any change that shapes a decode clears
     /// the map — and only the current file's two neighbours are kept, so the
     /// memory bound is two previews.
-    preload: HashMap<PathBuf, Box<Preview>>,
+    preload: HashMap<PathBuf, (Entry, Box<Preview>)>,
     /// Preloads currently decoding, so holding a key does not start the same
     /// decode twice.
     preload_inflight: HashSet<PathBuf>,
@@ -361,6 +370,10 @@ pub struct App {
     /// Whether the desktop was in dark mode when the theme was last seen, so a
     /// theme change can tell a light/dark switch from any other edit.
     dark: bool,
+
+    /// The latest directory listing asked for, so an older one that lands
+    /// late is not installed over a newer selection.
+    listing: u64,
 }
 
 impl App {
@@ -409,6 +422,7 @@ impl App {
             awaiting_first_configure: false,
             previewer: None,
             dark: cosmic::theme::is_dark(),
+            listing: 0,
         };
         app.panel.set_animated(app.config.animate);
         app
@@ -467,18 +481,6 @@ impl App {
         self.player = None;
         self.pending_frames = 0;
 
-        let Some(entry) = Entry::load(&path) else {
-            // The file went away between being selected and being opened, which
-            // is common enough — a download finishing, a build directory being
-            // cleaned — that it is a preview rather than an error.
-            self.entry = None;
-            self.preview = peek_engine::preview::missing(&path);
-            self.image = None;
-            self.animation = None;
-            return self.refresh_blur();
-        };
-
-        self.entry = Some(entry.clone());
         self.page = self.page.min(page_count(&self.preview).saturating_sub(1));
 
         let options = self.options();
@@ -486,26 +488,17 @@ impl App {
         // A neighbour decoded ahead of time makes this navigation free. Only
         // page zero is ever preloaded, so any other page has to decode.
         if options.page == 0
-            && let Some(preview) = self.preload.remove(&path)
+            && let Some((entry, preview)) = self.preload.remove(&path)
         {
+            self.entry = Some(entry);
             return self.apply_loaded(preview);
         }
 
         Task::future(async move {
-            // Decoding is CPU work; `spawn_blocking` keeps it off the executor
-            // that is also driving the compositor connection.
-            let preview =
-                tokio::task::spawn_blocking(move || peek_engine::preview::load(&entry, options))
-                    .await
-                    .unwrap_or_else(|error| {
-                        // A decoder panicking is a bug in a codec, not a reason
-                        // to lose the preview: the card still describes the file.
-                        tracing::error!(%error, "the decoder thread panicked");
-                        Preview::Card(Box::default())
-                    });
-
+            let (entry, preview) = decode_off_thread(path, options).await;
             cosmic::action::app(Message::Loaded {
                 generation,
+                entry: entry.map(Box::new),
                 preview: Box::new(preview),
             })
         })
@@ -606,10 +599,6 @@ impl App {
             if self.preload.contains_key(&path) || self.preload_inflight.contains(&path) {
                 continue;
             }
-            let Some(entry) = Entry::load(&path) else {
-                continue;
-            };
-
             self.preload_inflight.insert(path.clone());
             let options = Options {
                 page: 0,
@@ -617,18 +606,11 @@ impl App {
             };
 
             tasks.push(Task::future(async move {
-                let preview = tokio::task::spawn_blocking(move || {
-                    peek_engine::preview::load(&entry, options)
-                })
-                .await
-                .unwrap_or_else(|error| {
-                    tracing::error!(%error, "the preload thread panicked");
-                    Preview::Card(Box::default())
-                });
-
+                let (entry, preview) = decode_off_thread(path.clone(), options).await;
                 cosmic::action::app(Message::Preloaded {
                     key,
                     path,
+                    entry: entry.map(Box::new),
                     preview: Box::new(preview),
                 })
             }));
@@ -672,26 +654,25 @@ impl App {
         let entry = self.entry.clone();
 
         Task::future(async move {
-            let preview = tokio::task::spawn_blocking(move || {
-                match session.render(options.page, options.page_target) {
-                    Ok(pdf) => Preview::Pdf(Box::new(pdf)),
-                    Err(error) => {
-                        tracing::debug!(%error, "page render fell back to a full load");
-                        match &entry {
-                            Some(entry) => peek_engine::preview::load(entry, options),
-                            None => Preview::Card(Box::default()),
-                        }
-                    }
-                }
+            let rendered = tokio::task::spawn_blocking(move || {
+                session.render(options.page, options.page_target)
             })
-            .await
-            .unwrap_or_else(|error| {
-                tracing::error!(%error, "the page render thread panicked");
-                Preview::Card(Box::default())
-            });
+            .await;
+            let (entry, preview) = match rendered {
+                Ok(Ok(pdf)) => (entry, Preview::Pdf(Box::new(pdf))),
+                Ok(Err(error)) => {
+                    tracing::debug!(%error, "page render fell back to a full load");
+                    decode_off_thread(path, options).await
+                }
+                Err(error) => {
+                    tracing::error!(%error, "the page render thread panicked");
+                    (entry, Preview::Card(Box::default()))
+                }
+            };
 
             cosmic::action::app(Message::Loaded {
                 generation,
+                entry: entry.map(Box::new),
                 preview: Box::new(preview),
             })
         })
@@ -918,10 +899,11 @@ impl App {
 
     /// Hand the current file to its default application.
     fn open_externally(&mut self) -> Task<Message> {
-        let Some(entry) = &self.entry else {
+        // The file the user is on, not the last one that finished decoding.
+        let Some(path) = self.around.current() else {
             return Task::none();
         };
-        let Some(uri) = previewer::uri_from_path(&entry.path) else {
+        let Some(uri) = previewer::uri_from_path(path) else {
             return Task::none();
         };
 
@@ -1115,6 +1097,35 @@ impl Setting {
     }
 }
 
+/// Stat, detect and decode one file: the blocking half of every load.
+///
+/// The stat is here rather than on the update thread: on a slow mount it
+/// takes as long as the decode, and the overlay must keep answering keys
+/// while it runs. A file that is gone by now — a download finishing, a build
+/// directory being cleaned — is a preview saying so, not an error.
+fn decode(path: &std::path::Path, options: Options) -> (Option<Entry>, Preview) {
+    match Entry::load(path) {
+        Some(entry) => {
+            let preview = peek_engine::preview::load(&entry, options);
+            (Some(entry), preview)
+        }
+        None => (None, peek_engine::preview::missing(path)),
+    }
+}
+
+/// [`decode`] on the blocking pool, keeping CPU work off the executor that
+/// also drives the compositor connection.
+async fn decode_off_thread(path: PathBuf, options: Options) -> (Option<Entry>, Preview) {
+    tokio::task::spawn_blocking(move || decode(&path, options))
+        .await
+        .unwrap_or_else(|error| {
+            // A decoder panicking is a bug in a codec, not a reason to lose
+            // the overlay.
+            tracing::error!(%error, "the decoder thread panicked");
+            (None, Preview::Card(Box::default()))
+        })
+}
+
 /// Index-sheet decodes that may run at once: one per core, so the sheet
 /// fills as fast as the machine allows and no faster than it can.
 fn thumbnail_concurrency() -> usize {
@@ -1253,15 +1264,31 @@ impl cosmic::Application for App {
             Message::None => Task::none(),
 
             Message::Show { paths, index } => {
-                self.around = match paths.len() {
-                    0 => return Task::none(),
-                    // One file names a *position*, not a set: the rest of the
-                    // directory is what the arrow keys move through.
-                    1 => Neighbourhood::around(&paths[0]),
-                    // Several files name the set outright, so the directory is
-                    // not consulted.
-                    _ => Neighbourhood::from_list(paths, index),
+                if paths.is_empty() {
+                    return Task::none();
+                }
+                self.listing = self.listing.wrapping_add(1);
+                // One file names a *position*, not a set: the rest of the
+                // directory is what the arrow keys move through. Listing it
+                // stats every entry, which on a network mount can take
+                // seconds, so it happens off the update thread while the file
+                // itself is already loading; until it lands, the file is its
+                // own neighbourhood. Several files name the set outright, and
+                // the directory is not consulted.
+                let listing = match paths.as_slice() {
+                    [single] => {
+                        let (path, listing) = (single.clone(), self.listing);
+                        Task::future(async move {
+                            let around =
+                                tokio::task::spawn_blocking(move || Neighbourhood::around(&path))
+                                    .await
+                                    .unwrap_or_default();
+                            cosmic::action::app(Message::Listed { listing, around })
+                        })
+                    }
+                    _ => Task::none(),
                 };
+                self.around = Neighbourhood::from_list(paths, index);
 
                 self.zoom = 1.0;
                 self.pan = Vector::new(0.0, 0.0);
@@ -1279,14 +1306,35 @@ impl cosmic::Application for App {
                 if self.awaiting_first_configure {
                     // Surface still being negotiated — see `deferred_load`.
                     self.deferred_load = true;
-                    return open;
+                    return Task::batch([open, listing]);
                 }
 
-                Task::batch([open, self.reload()])
+                Task::batch([open, listing, self.reload()])
+            }
+
+            Message::Listed { listing, around } => {
+                // Only the latest listing, and only while the selection is
+                // still the one file it was listed for.
+                if listing != self.listing
+                    || self.around.len() != 1
+                    || around.current() != self.around.current()
+                {
+                    return Task::none();
+                }
+                self.around = around;
+                // The neighbours exist now: decode them ahead of the arrows,
+                // and fill a sheet opened while the listing ran.
+                let thumbnails = if self.grid {
+                    self.schedule_thumbnails()
+                } else {
+                    Task::none()
+                };
+                Task::batch([self.schedule_preloads(), thumbnails])
             }
 
             Message::Loaded {
                 generation,
+                entry,
                 preview,
             } => {
                 // Stale-response guard. A load that started before the last
@@ -1297,19 +1345,28 @@ impl cosmic::Application for App {
                     return Task::none();
                 }
 
+                self.entry = entry.map(|entry| *entry);
                 self.apply_loaded(preview)
             }
 
-            Message::Preloaded { key, path, preview } => {
+            Message::Preloaded {
+                key,
+                path,
+                entry,
+                preview,
+            } => {
                 self.preload_inflight.remove(&path);
                 // Kept only while everything that shaped the decode still
                 // holds: the options, the file's place beside the cursor, and
                 // an overlay that is actually up to spend the memory on.
-                if self.surface.is_some()
+                // A neighbour that vanished is decoded again when reached,
+                // which is what says it is gone.
+                if let Some(entry) = entry
+                    && self.surface.is_some()
                     && key == self.preload_key()
                     && self.neighbour_paths().contains(&path)
                 {
-                    self.preload.insert(path, preview);
+                    self.preload.insert(path, (*entry, preview));
                 }
                 Task::none()
             }
@@ -1548,10 +1605,12 @@ impl cosmic::Application for App {
             }
 
             Message::CopyPath => {
-                let Some(entry) = &self.entry else {
+                // The file the user is on, not the last one that finished
+                // decoding.
+                let Some(path) = self.around.current() else {
                     return Task::none();
                 };
-                cosmic::iced::clipboard::write(entry.path.display().to_string())
+                cosmic::iced::clipboard::write(path.display().to_string())
             }
 
             Message::TogglePlay => {
@@ -1996,6 +2055,67 @@ mod tests {
         App::new(Core::default(), config)
     }
 
+    #[test]
+    fn showing_one_file_lists_its_directory_off_the_update_thread() {
+        let dir = std::env::temp_dir().join("peek-test-app-listing");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create");
+        for name in ["a.txt", "b.txt", "c.txt"] {
+            std::fs::write(dir.join(name), name).expect("write");
+        }
+        let shown = dir.join("b.txt");
+
+        let mut app = app(Config::default());
+        let _ = app.update(Message::Show {
+            paths: vec![shown.clone()],
+            index: 0,
+        });
+        assert_eq!(app.around.len(), 1, "the directory is not read in update");
+        assert_eq!(app.around.current(), Some(shown.as_path()));
+
+        // A listing from an earlier selection is not installed.
+        let listed = Neighbourhood::around(&shown);
+        let _ = app.update(Message::Listed {
+            listing: app.listing.wrapping_sub(1),
+            around: listed.clone(),
+        });
+        assert_eq!(app.around.len(), 1);
+
+        let _ = app.update(Message::Listed {
+            listing: app.listing,
+            around: listed,
+        });
+        assert_eq!(app.around.len(), 3);
+        assert_eq!(app.around.current(), Some(shown.as_path()));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_load_sets_the_entry_it_stat_ed() {
+        let path = std::env::temp_dir().join("peek-test-app-entry.txt");
+        std::fs::write(&path, "hello\n").expect("write");
+        let mut app = app(Config::default());
+        app.around = Neighbourhood::from_list(vec![path.clone()], 0);
+
+        let _ = app.reload();
+        assert!(app.entry.is_none(), "nothing is stat'd in update");
+
+        let (entry, preview) = decode(&path, app.options());
+        let _ = app.update(Message::Loaded {
+            generation: app.generation,
+            entry: entry.map(Box::new),
+            preview: Box::new(preview),
+        });
+        assert_eq!(
+            app.entry.as_ref().map(|entry| entry.path.clone()),
+            Some(path.clone())
+        );
+        assert!(matches!(app.preview, Preview::Text(_)));
+
+        let _ = std::fs::remove_file(path);
+    }
+
     #[tokio::test]
     async fn bounded_work_never_runs_more_than_its_permits_at_once() {
         use std::sync::Arc;
@@ -2161,6 +2281,14 @@ mod tests {
         );
         assert_eq!(app.pending_frames, 0, "nothing more is drawn for it");
         assert!(app.player.is_none());
+
+        // What the load started by the step delivers.
+        let (entry, preview) = decode(&gone, app.options());
+        let _ = app.update(Message::Loaded {
+            generation: app.generation,
+            entry: entry.map(Box::new),
+            preview: Box::new(preview),
+        });
         assert!(app.entry.is_none());
         assert!(
             matches!(

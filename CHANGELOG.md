@@ -92,6 +92,10 @@ All notable changes to this project are documented here. The format follows
   file refused that way says it is too large rather than damaged.
 - Audio claimed by a plugin's `media` rule shows its embedded cover art,
   as built-in audio formats do.
+- The overlay keeps answering keys while a file on a slow network mount is
+  being opened. Reading a file's details and listing its folder used to run
+  on the interface thread, so each arrow press could freeze it; the file now
+  opens first and the rest of its folder joins the arrow keys when listed.
 
 ## [2.1.0] - 2026-09-22
 
