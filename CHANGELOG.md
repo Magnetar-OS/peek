@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Rebuilt against the current COSMIC libraries (libcosmic `03d7dcb`).
 - `peek-engine` 2.0.0 (prepared, not yet published): breaking API changes.
   `preview::Reason` gains `Missing` and loses the unreachable `NoCodec`;
   `media::Error` loses the never-built `Undecodable`; `FontSpecimen` gains
