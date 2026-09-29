@@ -261,17 +261,7 @@ pub fn load(entry: &Entry, options: Options) -> Preview {
         Kind::Archive => archive(entry, card),
 
         #[cfg(feature = "media")]
-        Kind::Video | Kind::Audio => match crate::media::probe(&entry.path) {
-            Ok(mut media) => {
-                // Cover art is only read for audio, and only once the file is
-                // the one actually on screen — it costs an image decode.
-                if entry.kind == Kind::Audio && media.poster.is_none() {
-                    media.poster = crate::media::cover_art(&entry.path);
-                }
-                Preview::Media(Box::new(media))
-            }
-            Err(error) => failed(reason_for_media(&error), error, card()),
-        },
+        Kind::Video | Kind::Audio => media(entry, card),
 
         Kind::Plugin => plugin_preview(entry, options, card),
 
@@ -323,10 +313,7 @@ fn plugin_preview(entry: &Entry, options: Options, card: impl Fn() -> Box<Card>)
         #[cfg(not(feature = "media"))]
         Handler::Media => Preview::Card(card()),
         #[cfg(feature = "media")]
-        Handler::Media => match crate::media::probe(&entry.path) {
-            Ok(media) => Preview::Media(Box::new(media)),
-            Err(error) => failed(reason_for_media(&error), error, card()),
-        },
+        Handler::Media => media(entry, card),
         Handler::Command => {
             let product = match crate::plugin::run(rule, &entry.path, options.page_target) {
                 Ok(product) => product,
@@ -422,6 +409,30 @@ fn reason_for_pdf(error: &crate::pdf::Error) -> Reason {
             Reason::Undecodable
         }
     }
+}
+
+/// Probe audio or video, with cover art for anything without a picture.
+///
+/// One function for the built-in types and for a plugin's `media` rule, so a
+/// plugin-claimed audio format gets its cover the same way. Whether there is
+/// a picture is the probe's answer, not the detected kind's: a plugin rule
+/// cannot say which it claimed. Cover art is read only here, once the file
+/// is the one on screen — it costs an image decode.
+#[cfg(feature = "media")]
+fn media(entry: &Entry, card: impl Fn() -> Box<Card>) -> Preview {
+    match crate::media::probe(&entry.path) {
+        Ok(media) => Preview::Media(Box::new(with_cover_art(media, &entry.path))),
+        Err(error) => failed(reason_for_media(&error), error, card()),
+    }
+}
+
+/// Attach embedded cover art to a stream with no picture of its own.
+#[cfg(feature = "media")]
+fn with_cover_art(mut media: Media, path: &std::path::Path) -> Media {
+    if !media.has_video && media.poster.is_none() {
+        media.poster = crate::media::cover_art(path);
+    }
+    media
 }
 
 /// List an archive, or describe the file when it is not one this reads.
@@ -571,6 +582,59 @@ mod tests {
             Preview::Failed { reason, .. } => assert_eq!(reason, Reason::TooLarge),
             other => panic!("expected a card with a reason, got {other:?}"),
         }
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    /// A silent WAV carrying an ID3 tag with a front cover.
+    #[cfg(feature = "media")]
+    fn wav_with_cover(name: &str) -> std::path::PathBuf {
+        use lofty::config::WriteOptions;
+        use lofty::picture::{MimeType, Picture, PictureType};
+        use lofty::tag::{Tag, TagExt, TagType};
+
+        let samples = [0u8; 400];
+        let mut wav = Vec::new();
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36 + samples.len() as u32).to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        wav.extend_from_slice(&1u16.to_le_bytes()); // mono
+        wav.extend_from_slice(&8000u32.to_le_bytes());
+        wav.extend_from_slice(&8000u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&8u16.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&(samples.len() as u32).to_le_bytes());
+        wav.extend_from_slice(&samples);
+        let path = write(name, &wav);
+
+        let mut png = Vec::new();
+        image::DynamicImage::ImageRgba8(image::RgbaImage::new(3, 2))
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .expect("encode");
+        let mut tag = Tag::new(TagType::Id3v2);
+        tag.push_picture(
+            Picture::unchecked(png)
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Png)
+                .build(),
+        );
+        tag.save_to_path(&path, WriteOptions::default())
+            .expect("tag the file");
+        path
+    }
+
+    #[cfg(feature = "media")]
+    #[test]
+    fn audio_gets_its_cover_whichever_way_it_was_claimed() {
+        let path = wav_with_cover("peek-test-preview-cover.wav");
+        // What a plugin rule's probe of an audio file looks like: no video,
+        // no poster. The detected kind plays no part.
+        let media = with_cover_art(Media::default(), &path);
+        let cover = media.poster.expect("the embedded cover");
+        assert_eq!((cover.width, cover.height), (3, 2));
 
         let _ = std::fs::remove_file(path);
     }

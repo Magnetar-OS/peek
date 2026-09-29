@@ -90,6 +90,8 @@ All notable changes to this project are documented here. The format follows
 - A comic page, camera-raw preview, EPUB cover or album cover too large to
   decode is refused from its header, like an image file, and a comic or raw
   file refused that way says it is too large rather than damaged.
+- Audio claimed by a plugin's `media` rule shows its embedded cover art,
+  as built-in audio formats do.
 
 ## [2.1.0] - 2026-09-22
 
