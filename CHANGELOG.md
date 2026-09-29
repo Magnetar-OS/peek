@@ -14,6 +14,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `peek-engine` 2.0.0 (prepared, not yet published): breaking API changes.
+  `preview::Reason` gains `Missing` and loses the unreachable `NoCodec`;
+  `media::Error` loses the never-built `Undecodable`; `FontSpecimen` gains
+  `weight`, `stretch` and `italic`. New: `preview::missing`,
+  `meta::missing_card`, `picture::decode_bytes`, `text::load_with_fallback`
+  and `plugin::Registry::syntax_for`.
 - `.tar.xz` archives are listed by a pure-Rust decoder, so the packages no
   longer depend on `xz` / `liblzma`. A stream whose header asks for more than
   256 MiB of decoder memory is refused instead of allocated.
