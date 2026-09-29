@@ -106,8 +106,10 @@ from wherever the user's cursor is. This milestone is integration, not pixels.
   the pattern every COSMIC applet uses — makes them discoverable. The config
   is already watched, so changes keep applying live.
 - **Flatpak, and the stores.** *Manifest written* at
-  `packaging/flatpak/`, with the sandbox trade-offs argued in its comments; it
-  needs a real poppler checksum and a Flathub submission. `nfpm` covers deb and rpm; a Flatpak
+  `packaging/flatpak/`, with the sandbox trade-offs argued in its comments; the
+  poppler checksum is real (26.08.0) and `just flatpak-sources` generates the
+  crate sources. It needs a first `flatpak-builder` run and a Flathub
+  submission. `nfpm` covers deb and rpm; a Flatpak
   manifest brings Flathub and the COSMIC Store. The layer-shell surface and
   the D-Bus names need portal-era scrutiny here — this is where sandboxing
   assumptions get found, not papered over.
