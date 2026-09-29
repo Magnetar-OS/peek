@@ -13,6 +13,8 @@
 //! The help text is generated from the same table, so `--help` cannot list a
 //! key the handler ignores or miss one it answers.
 
+use std::fmt::Write as _;
+
 use cosmic::iced::keyboard::key::Named;
 use cosmic::iced::keyboard::{Key, Modifiers};
 
@@ -186,10 +188,11 @@ pub fn help() -> String {
         .max()
         .unwrap_or(0)
         + 2;
-    BINDINGS
-        .iter()
-        .map(|binding| format!("  {:width$}{}\n", binding.keys, binding.does))
-        .collect()
+    let mut help = String::new();
+    for binding in BINDINGS {
+        let _ = writeln!(help, "  {:width$}{}", binding.keys, binding.does);
+    }
+    help
 }
 
 #[cfg(test)]
