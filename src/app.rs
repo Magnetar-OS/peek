@@ -869,10 +869,24 @@ impl App {
         // two decoded neighbours are real memory, and a hidden previewer has no
         // claim to it.
         self.preload.clear();
+        self.preload_inflight.clear();
         // Thumbnails are the larger cache of the two and are only wanted by a
         // grid that is no longer on screen.
-        self.thumbnails.clear();
+        self.release_thumbnails();
         surface::close(id).map(|()| cosmic::action::app(Message::None))
+    }
+
+    /// Drop the index sheet's cells, and the decodes still waiting for one.
+    ///
+    /// Closing the permits makes every decode that has not started skip its
+    /// work (see [`run_bounded`]); a fresh set serves the next sheet. Decodes
+    /// already running finish and are dropped when they land.
+    fn release_thumbnails(&mut self) {
+        self.thumbnails.clear();
+        self.thumbnails_inflight.clear();
+        self.thumbnail_permits.close();
+        self.thumbnail_permits =
+            std::sync::Arc::new(tokio::sync::Semaphore::new(thumbnail_concurrency()));
     }
 
     /// Move through the neighbourhood.
@@ -1258,7 +1272,7 @@ impl cosmic::Application for App {
                 self.grid_index = 0;
                 // A new selection is a new set of cells; the old ones describe
                 // files that may not be in it.
-                self.thumbnails.clear();
+                self.release_thumbnails();
                 self.panel.stepped(Instant::now(), true);
 
                 let open = self.open();
@@ -1507,7 +1521,12 @@ impl cosmic::Application for App {
             }
 
             Message::Thumbnail { path, raster } => {
-                self.thumbnails_inflight.remove(&path);
+                // Only wanted by a sheet that is still there to show it: one
+                // landing after the overlay closed, or after the selection
+                // changed, would refill a cache that was just released.
+                if !self.thumbnails_inflight.remove(&path) || self.surface.is_none() {
+                    return Task::none();
+                }
                 self.thumbnails
                     .insert(path, raster.map(view::handle_from_raster));
                 Task::none()
@@ -2093,6 +2112,30 @@ mod tests {
         assert_eq!(app.around.current(), Some(real.as_path()));
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn closing_releases_the_sheet_and_ignores_cells_that_land_late() {
+        let mut app = app(Config::default());
+        let path = PathBuf::from("/tmp/peek-test-app-late-cell.png");
+        app.surface = Some(window::Id::unique());
+        app.thumbnails_inflight.insert(path.clone());
+        let old_permits = std::sync::Arc::clone(&app.thumbnail_permits);
+
+        let _ = app.finish_close();
+        assert!(old_permits.is_closed(), "waiting decodes are skipped");
+        assert!(
+            !app.thumbnail_permits.is_closed(),
+            "the next sheet can decode"
+        );
+        assert!(app.thumbnails_inflight.is_empty());
+
+        let raster = peek_engine::Raster::new(1, 1, vec![0; 4]);
+        let _ = app.update(Message::Thumbnail {
+            path,
+            raster: Box::new(raster),
+        });
+        assert!(app.thumbnails.is_empty(), "a late cell is not cached");
     }
 
     #[test]
