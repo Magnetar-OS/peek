@@ -87,6 +87,9 @@ All notable changes to this project are documented here. The format follows
   the shipped example were written for, which never took effect because
   plugins were consulted only for files with no previewer. The example no
   longer claims `justfile`, a file name no rule can match.
+- A comic page, camera-raw preview, EPUB cover or album cover too large to
+  decode is refused from its header, like an image file, and a comic or raw
+  file refused that way says it is too large rather than damaged.
 
 ## [2.1.0] - 2026-09-22
 

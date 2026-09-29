@@ -78,7 +78,7 @@ pub fn preview(path: &Path) -> Result<Picture, Error> {
     let data = std::fs::read(path).map_err(io)?;
     let jpeg = find_preview(&data).ok_or(Error::NoPreview)?;
 
-    let mut decoded = image::load_from_memory(jpeg)?;
+    let mut decoded = picture::decode_bytes(jpeg)?;
 
     // The embedded JPEG is usually stored unrotated, with the orientation in
     // the raw container's own IFD — which is exactly what the EXIF reader

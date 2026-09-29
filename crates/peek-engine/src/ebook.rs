@@ -99,7 +99,7 @@ pub fn load(path: &Path) -> Result<Ebook, Error> {
 
     let cover = package.cover_href.as_deref().and_then(|href| {
         let bytes = member_bytes(&mut archive, &join(base, href), MAX_CHAPTER_BYTES)?;
-        let decoded = image::load_from_memory(&bytes).ok()?;
+        let decoded = crate::picture::decode_bytes(&bytes).ok()?;
         let reduced = crate::picture::reduce(decoded, COVER_EDGE);
         Raster::new(reduced.width(), reduced.height(), reduced.into_raw())
     });

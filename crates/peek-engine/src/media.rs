@@ -398,7 +398,7 @@ pub fn cover_art(path: &Path) -> Option<Raster> {
     let tag = tagged.primary_tag().or_else(|| tagged.first_tag())?;
     let picture = tag.pictures().first()?;
 
-    let decoded = image::load_from_memory(picture.data()).ok()?;
+    let decoded = crate::picture::decode_bytes(picture.data()).ok()?;
     let reduced = crate::picture::reduce(decoded, POSTER_EDGE);
     Raster::new(reduced.width(), reduced.height(), reduced.into_raw())
 }

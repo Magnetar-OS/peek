@@ -122,7 +122,7 @@ pub fn render(path: &Path, page: usize, target: u32) -> Result<Comic, Error> {
         )));
     }
 
-    let decoded = image::load_from_memory(&bytes)?;
+    let decoded = crate::picture::decode_bytes(&bytes)?;
     let reduced = crate::picture::reduce(decoded, target.clamp(MIN_EDGE, MAX_EDGE));
     let raster =
         Raster::new(reduced.width(), reduced.height(), reduced.into_raw()).ok_or(Error::Blank)?;

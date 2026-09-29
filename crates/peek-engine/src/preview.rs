@@ -383,10 +383,18 @@ fn failed(reason: Reason, error: impl std::fmt::Display, card: Box<Card>) -> Pre
 // functions rather than `From` impls because the mapping is this module's
 // opinion about presentation, not a property of the error types.
 
+/// Whether a decode was refused for size rather than failed: the `image`
+/// crate's limits, and [`crate::picture::decode_bytes`]'s pixel ceiling,
+/// both report as a limits error.
+fn too_large(error: &image::ImageError) -> bool {
+    matches!(error, image::ImageError::Limits(_))
+}
+
 fn reason_for_picture(error: &crate::picture::Error) -> Reason {
     use crate::picture::Error;
     match error {
         Error::Io { .. } => Reason::Unreadable,
+        Error::Decode(error) if too_large(error) => Reason::TooLarge,
         Error::Decode(_) | Error::Svg(_) => Reason::Undecodable,
         Error::TooLarge { .. } => Reason::TooLarge,
         Error::Empty => Reason::Empty,
@@ -399,6 +407,7 @@ fn reason_for_raw(error: &crate::raw::Error) -> Reason {
         Error::Io { .. } => Reason::Unreadable,
         Error::TooLarge { .. } => Reason::TooLarge,
         Error::NoPreview => Reason::NoPreview,
+        Error::Decode(error) if too_large(error) => Reason::TooLarge,
         Error::Decode(_) => Reason::Undecodable,
     }
 }
@@ -434,6 +443,7 @@ fn reason_for_comic(error: &crate::comic::Error) -> Reason {
     use crate::comic::Error;
     match error {
         Error::Io { .. } => Reason::Unreadable,
+        Error::Decode(error) if too_large(error) => Reason::TooLarge,
         Error::Damaged(_) | Error::Decode(_) | Error::Blank => Reason::Undecodable,
         Error::NoPages | Error::NoSuchPage(_) => Reason::Empty,
         Error::PageTooLarge { .. } => Reason::TooLarge,
@@ -530,6 +540,37 @@ mod tests {
             matches!(preview, Preview::Card(_)),
             "expected the plain card, got {preview:?}"
         );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_comic_page_too_large_to_decode_says_so() {
+        // Before, an oversized page in memory hit the `image` crate's
+        // allocation limit and was reported as damaged.
+        let path = std::env::temp_dir().join("peek-test-preview-huge-page.cbz");
+        {
+            let file = std::fs::File::create(&path).expect("create");
+            let mut writer = zip::ZipWriter::new(file);
+            writer
+                .start_file(
+                    "page1.png",
+                    zip::write::SimpleFileOptions::default()
+                        .compression_method(zip::CompressionMethod::Stored),
+                )
+                .expect("start");
+            writer
+                .write_all(&crate::picture::tests::png_claiming(24_000, 24_000))
+                .expect("write");
+            writer.finish().expect("finish");
+        }
+        let entry = Entry::load(&path).expect("stats");
+        assert_eq!(entry.kind, Kind::Comic);
+
+        match load(&entry, Options::default()) {
+            Preview::Failed { reason, .. } => assert_eq!(reason, Reason::TooLarge),
+            other => panic!("expected a card with a reason, got {other:?}"),
+        }
 
         let _ = std::fs::remove_file(path);
     }

@@ -117,6 +117,34 @@ pub enum Error {
     Empty,
 }
 
+/// Refuse an image past [`MAX_PIXELS`] from its header alone.
+fn check_pixels(width: u32, height: u32) -> Result<(), image::ImageError> {
+    if u64::from(width) * u64::from(height) > MAX_PIXELS {
+        return Err(image::ImageError::Limits(
+            image::error::LimitError::from_kind(image::error::LimitErrorKind::DimensionError),
+        ));
+    }
+    Ok(())
+}
+
+/// Decode an image held in memory — a comic page, an embedded JPEG, a cover.
+///
+/// The same rule [`raster`] applies to a file: the header is read first, and
+/// an image past [`MAX_PIXELS`] is refused before a pixel is decoded. The
+/// `image` crate's own allocation limit still applies to what is decoded.
+/// A refusal on size is an [`image::ImageError::Limits`], so every caller can
+/// tell "too large" from "damaged" the same way.
+///
+/// # Errors
+///
+/// The decoder's error, or a limits error for an image too large to decode.
+pub fn decode_bytes(bytes: &[u8]) -> Result<image::DynamicImage, image::ImageError> {
+    let reader = || ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format();
+    let (width, height) = reader()?.into_dimensions()?;
+    check_pixels(width, height)?;
+    reader()?.decode()
+}
+
 /// Decode a raster image, reducing it to something a display can use.
 ///
 /// # Errors
@@ -139,7 +167,7 @@ pub fn raster(path: &Path) -> Result<Picture, Error> {
 
     let format = reader.format();
     let (source_width, source_height) = reader.into_dimensions()?;
-    if u64::from(source_width) * u64::from(source_height) > MAX_PIXELS {
+    if check_pixels(source_width, source_height).is_err() {
         return Err(Error::TooLarge {
             width: source_width,
             height: source_height,
@@ -424,8 +452,39 @@ pub(crate) fn exif_summary(path: &Path) -> Vec<(String, String)> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    /// A PNG whose header claims `width` × `height` — the pixel data is a
+    /// single pixel's worth, so only a decoder that trusts the header would
+    /// try to allocate for the claim.
+    pub(crate) fn png_claiming(width: u32, height: u32) -> Vec<u8> {
+        let mut png = Vec::new();
+        image::DynamicImage::ImageRgba8(image::RgbaImage::new(1, 1))
+            .write_to(&mut std::io::Cursor::new(&mut png), ImageFormat::Png)
+            .expect("encode");
+        // IHDR: length (8..12), type (12..16), width (16..20), height
+        // (20..24), the rest of the header, then a CRC over type and data.
+        png[16..20].copy_from_slice(&width.to_be_bytes());
+        png[20..24].copy_from_slice(&height.to_be_bytes());
+        let mut crc = flate2::Crc::new();
+        crc.update(&png[12..29]);
+        png[29..33].copy_from_slice(&crc.sum().to_be_bytes());
+        png
+    }
+
+    #[test]
+    fn an_image_in_memory_past_the_pixel_ceiling_is_refused_from_its_header() {
+        // 24 000 × 24 000 is 576 megapixels: over the ceiling.
+        let result = decode_bytes(&png_claiming(24_000, 24_000));
+        assert!(
+            matches!(result, Err(image::ImageError::Limits(_))),
+            "got {result:?}"
+        );
+        // A real small image still decodes.
+        let ordinary = decode_bytes(&png_claiming(1, 1)).expect("decodes");
+        assert_eq!((ordinary.width(), ordinary.height()), (1, 1));
+    }
 
     #[test]
     fn small_images_are_left_alone() {
