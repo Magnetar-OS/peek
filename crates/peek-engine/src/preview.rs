@@ -593,10 +593,11 @@ mod tests {
         use lofty::picture::{MimeType, Picture, PictureType};
         use lofty::tag::{Tag, TagExt, TagType};
 
-        let samples = [0u8; 400];
+        const SAMPLES: u32 = 400;
+        let samples = [0u8; SAMPLES as usize];
         let mut wav = Vec::new();
         wav.extend_from_slice(b"RIFF");
-        wav.extend_from_slice(&(36 + samples.len() as u32).to_le_bytes());
+        wav.extend_from_slice(&(36 + SAMPLES).to_le_bytes());
         wav.extend_from_slice(b"WAVEfmt ");
         wav.extend_from_slice(&16u32.to_le_bytes());
         wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
@@ -606,7 +607,7 @@ mod tests {
         wav.extend_from_slice(&1u16.to_le_bytes());
         wav.extend_from_slice(&8u16.to_le_bytes());
         wav.extend_from_slice(b"data");
-        wav.extend_from_slice(&(samples.len() as u32).to_le_bytes());
+        wav.extend_from_slice(&SAMPLES.to_le_bytes());
         wav.extend_from_slice(&samples);
         let path = write(name, &wav);
 
