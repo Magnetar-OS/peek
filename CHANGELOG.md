@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Rebuilt against the current COSMIC libraries (libcosmic `6af8b70`).
 - The Flatpak manifest builds. Built for the first time, at user scope
   against the 26.08 runtime, it needed four things: the checkout's `target`
   directory and flatpak-builder's own working directories are left out of
