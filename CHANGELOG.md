@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A long EPUB chapter or DOCX/ODT document is read up to a size ceiling, and
+  when that ceiling fell inside a character the chapter was skipped or the
+  document failed to preview at all. The text up to the cut is shown, as it
+  already was for plain text files, and the preview says there is more. A
+  document cut inside a tag is shown the same way rather than reported as
+  damaged.
+
 ## [2.2.0] - 2026-09-29
 
 ### Added

@@ -72,6 +72,11 @@ fn body_member(mime: &str) -> Option<(&'static str, Dialect)> {
 /// Fails when the file cannot be read, is not the zip its type claims, or its
 /// document XML is missing or malformed.
 pub fn text(path: &Path, mime: &str) -> Result<Document, Error> {
+    text_bounded(path, mime, MAX_XML_BYTES)
+}
+
+/// [`text`], reading at most `xml_bytes` of the document XML.
+fn text_bounded(path: &Path, mime: &str, xml_bytes: u64) -> Result<Document, Error> {
     let (member, dialect) = body_member(mime).ok_or(Error::Unsupported)?;
 
     let io = |source: std::io::Error| Error::Io {
@@ -87,14 +92,27 @@ pub fn text(path: &Path, mime: &str) -> Result<Document, Error> {
         .by_name(member)
         .map_err(|error| Error::Damaged(error.to_string()))?;
 
-    let mut xml = String::new();
+    // One byte past the ceiling, to tell a document that ends there from one
+    // that goes on.
+    let mut xml = Vec::new();
     entry
-        .take(MAX_XML_BYTES)
-        .read_to_string(&mut xml)
+        .take(xml_bytes.saturating_add(1))
+        .read_to_end(&mut xml)
         .map_err(io)?;
+    let cut = xml.len() as u64 > xml_bytes;
+    if cut {
+        xml.truncate(usize::try_from(xml_bytes).unwrap_or(usize::MAX));
+    }
+    // A cut can land inside a character. That partial tail is the ceiling's
+    // doing, so it is dropped; XML that is not UTF-8 anywhere else is not a
+    // document this reads.
+    if text::trim_cut_character(&mut xml, cut) {
+        return Err(Error::Damaged("the document XML is not UTF-8".to_owned()));
+    }
+    let xml = String::from_utf8(xml).map_err(|error| Error::Damaged(error.to_string()))?;
 
-    let lines = extract(&xml, dialect).map_err(|error| Error::Damaged(error.to_string()))?;
-    let truncated = lines.len() >= text::MAX_LINES;
+    let lines = extract(&xml, dialect, cut).map_err(|error| Error::Damaged(error.to_string()))?;
+    let truncated = cut || lines.len() >= text::MAX_LINES;
     let bytes_read = xml.len();
 
     Ok(Document {
@@ -114,7 +132,11 @@ pub fn text(path: &Path, mime: &str) -> Result<Document, Error> {
 /// the same local names or near enough: text lives in text events, `p` (and
 /// ODF's `h`) ends a paragraph, `tab` is a tab, `br` and ODF's `line-break`
 /// break a line in place, and ODF's `s` is a run of spaces.
-fn extract(xml: &str, dialect: Dialect) -> Result<Vec<String>, quick_xml::Error> {
+///
+/// `cut` says the XML stops at the read ceiling rather than at its own end.
+/// Such a document ends mid-element more often than not, and the parse error
+/// that produces is where the text stops, not a reason to show none of it.
+fn extract(xml: &str, dialect: Dialect, cut: bool) -> Result<Vec<String>, quick_xml::Error> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(false);
 
@@ -137,7 +159,12 @@ fn extract(xml: &str, dialect: Dialect) -> Result<Vec<String>, quick_xml::Error>
             break;
         }
 
-        match reader.read_event()? {
+        let event = match reader.read_event() {
+            Ok(event) => event,
+            Err(_) if cut => break,
+            Err(error) => return Err(error),
+        };
+        match event {
             Event::Eof => break,
 
             Event::Start(element) => match element.local_name().as_ref() {
@@ -288,6 +315,52 @@ mod tests {
         assert_eq!(document.lines[0].plain(), "Chapter\t12");
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_document_cut_mid_character_shows_the_text_up_to_the_cut() {
+        // The XML is read up to a byte ceiling, which lands inside a
+        // character as readily as between two.
+        let xml = r#"<w:document xmlns:w="ns"><w:body>
+            <w:p><w:r><w:t>Πρώτη παράγραφος.</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Δεύτερη παράγραφος.</w:t></w:r></w:p>
+        </w:body></w:document>"#;
+        let ceiling = xml.find("ύτερη").expect("a two-byte character") + 1;
+        assert!(!xml.is_char_boundary(ceiling));
+        let path = zip_with("word/document.xml", xml, "peek-test-office-cut.docx");
+
+        let document = text_bounded(&path, DOCX, ceiling as u64).expect("extracts");
+        let lines: Vec<String> = document.lines.iter().map(text::Line::plain).collect();
+        assert_eq!(lines, ["Πρώτη παράγραφος.", "Δε"]);
+        assert!(document.truncated);
+        assert!(!document.lossy, "the cut is the ceiling's, not the file's");
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_document_cut_inside_a_tag_shows_the_text_up_to_the_cut() {
+        // The ceiling falling inside markup leaves XML that does not parse
+        // to its end. That is the ceiling's doing too.
+        let xml = r#"<w:document xmlns:w="ns"><w:body>
+            <w:p><w:r><w:t>First paragraph.</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Second paragraph.</w:t></w:r></w:p>
+        </w:body></w:document>"#;
+        let ceiling = xml.rfind("<w:p>").expect("the second paragraph") + 3;
+        let path = zip_with("word/document.xml", xml, "peek-test-office-cut-tag.docx");
+
+        let document = text_bounded(&path, DOCX, ceiling as u64).expect("extracts");
+        let lines: Vec<String> = document.lines.iter().map(text::Line::plain).collect();
+        assert_eq!(lines, ["First paragraph."]);
+        assert!(document.truncated);
+
+        // The same XML, whole, is simply malformed when it ends like that.
+        let broken = &xml[..ceiling];
+        let path_whole = zip_with("word/document.xml", broken, "peek-test-office-broken.docx");
+        assert!(matches!(text(&path_whole, DOCX), Err(Error::Damaged(_))));
+
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(path_whole);
     }
 
     #[test]

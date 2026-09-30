@@ -73,6 +73,11 @@ pub enum Error {
 /// to locate the package document. A missing cover or empty metadata is not a
 /// failure — the fields are simply absent.
 pub fn load(path: &Path) -> Result<Ebook, Error> {
+    load_bounded(path, MAX_CHAPTER_BYTES)
+}
+
+/// [`load`], reading at most `chapter_bytes` of each chapter.
+fn load_bounded(path: &Path, chapter_bytes: u64) -> Result<Ebook, Error> {
     let io = |source: std::io::Error| Error::Io {
         path: path.display().to_string(),
         source,
@@ -83,11 +88,11 @@ pub fn load(path: &Path) -> Result<Ebook, Error> {
     let mut archive =
         zip::ZipArchive::new(std::io::BufReader::new(file)).map_err(|e| damaged(&e))?;
 
-    let container = member_string(&mut archive, "META-INF/container.xml", MAX_CHAPTER_BYTES)
+    let (container, _) = member_string(&mut archive, "META-INF/container.xml", MAX_CHAPTER_BYTES)
         .ok_or_else(|| Error::Damaged("no container.xml".to_owned()))?;
     let opf_path = rootfile(&container)
         .ok_or_else(|| Error::Damaged("container.xml names no package document".to_owned()))?;
-    let opf = member_string(&mut archive, &opf_path, MAX_CHAPTER_BYTES)
+    let (opf, _) = member_string(&mut archive, &opf_path, MAX_CHAPTER_BYTES)
         .ok_or_else(|| Error::Damaged(format!("missing package document {opf_path}")))?;
 
     let package = parse_package(&opf).map_err(|e| damaged(&e))?;
@@ -106,14 +111,19 @@ pub fn load(path: &Path) -> Result<Ebook, Error> {
 
     let mut lines: Vec<Line> = Vec::new();
     let mut chapters_read = 0;
+    // A chapter longer than the ceiling is shown up to it; the rest of it is
+    // text the book holds and the preview does not.
+    let mut chapter_cut = false;
     for href in &package.spine {
         if lines.len() >= MAX_LINES || chapters_read >= MAX_CHAPTERS {
             break;
         }
-        let Some(xhtml) = member_string(&mut archive, &join(base, href), MAX_CHAPTER_BYTES) else {
+        let Some((xhtml, cut)) = member_string(&mut archive, &join(base, href), chapter_bytes)
+        else {
             continue;
         };
         chapters_read += 1;
+        chapter_cut |= cut;
 
         for paragraph in chapter_text(&xhtml) {
             if lines.len() >= MAX_LINES {
@@ -123,7 +133,7 @@ pub fn load(path: &Path) -> Result<Ebook, Error> {
         }
     }
 
-    let truncated = chapters_read < package.spine.len() || lines.len() >= MAX_LINES;
+    let truncated = chapter_cut || chapters_read < package.spine.len() || lines.len() >= MAX_LINES;
 
     Ok(Ebook {
         title: package.title,
@@ -351,20 +361,27 @@ fn attribute(element: &quick_xml::events::BytesStart<'_>, name: &str) -> Option<
         .map(|attribute| attribute.value.into_owned())
 }
 
-/// Read a zip member as UTF-8 text, bounded.
+/// Read a zip member as UTF-8 text, bounded. The flag is set when the member
+/// is longer than `limit` and the text stops there.
+///
+/// A read that stops at a byte count can stop partway through a character.
+/// That partial tail is the bound's doing, not the book's, so it is dropped
+/// and the text before it kept — a member that is not UTF-8 anywhere else is
+/// still refused.
 fn member_string<R: std::io::Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
     name: &str,
     limit: u64,
-) -> Option<String> {
-    let mut text = String::new();
-    archive
-        .by_name(name)
-        .ok()?
-        .take(limit)
-        .read_to_string(&mut text)
-        .ok()?;
-    Some(text)
+) -> Option<(String, bool)> {
+    let mut bytes = member_bytes(archive, name, limit.saturating_add(1))?;
+    let cut = bytes.len() as u64 > limit;
+    if cut {
+        bytes.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
+    }
+    if text::trim_cut_character(&mut bytes, cut) {
+        return None;
+    }
+    String::from_utf8(bytes).ok().map(|text| (text, cut))
 }
 
 /// Read a zip member's bytes, bounded.
@@ -399,6 +416,18 @@ mod tests {
 
     /// A minimal but honest EPUB: container, package, two chapters, a cover.
     fn fixture(name: &str) -> std::path::PathBuf {
+        fixture_with(
+            name,
+            br#"<html xmlns="http://www.w3.org/1999/xhtml">
+              <head><title>Ignored</title></head>
+              <body><h1>Chapter One</h1><p>It began, as
+              these things do, with a file.</p></body>
+            </html>"#,
+        )
+    }
+
+    /// [`fixture`] with a first chapter of the caller's choosing.
+    fn fixture_with(name: &str, chapter_one: &[u8]) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(name);
         let file = std::fs::File::create(&path).expect("create");
         let mut writer = zip::ZipWriter::new(file);
@@ -438,14 +467,7 @@ mod tests {
               </spine>
             </package>"#,
         );
-        add(
-            "OEBPS/chapter1.xhtml",
-            br#"<html xmlns="http://www.w3.org/1999/xhtml">
-              <head><title>Ignored</title></head>
-              <body><h1>Chapter One</h1><p>It began, as
-              these things do, with a file.</p></body>
-            </html>"#,
-        );
+        add("OEBPS/chapter1.xhtml", chapter_one);
         add(
             "OEBPS/chapter2.xhtml",
             br#"<html xmlns="http://www.w3.org/1999/xhtml">
@@ -488,6 +510,39 @@ mod tests {
             ]
         );
         assert!(!book.truncated);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_chapter_cut_mid_character_shows_the_text_up_to_the_cut() {
+        // A chapter longer than the per-chapter ceiling is read up to it, and
+        // the ceiling is a byte count: in any book not written in ASCII it
+        // lands inside a character as often as not.
+        let opening =
+            "Πρώτη παράγραφος, αρκετά μακριά ώστε το όριο να πέφτει βαθιά μέσα στο κεφάλαιο.";
+        let chapter = format!(
+            "<html><body><p>{opening}</p><p>{opening}</p><p>Δεύτερη παράγραφος.</p></body></html>"
+        );
+        let ceiling = chapter.find("ύτερη").expect("a two-byte character") + 1;
+        assert!(!chapter.is_char_boundary(ceiling));
+        let path = fixture_with("peek-test-book-cut.epub", chapter.as_bytes());
+
+        let book = load_bounded(&path, ceiling as u64).expect("loads");
+
+        let text: Vec<String> = book.lines.iter().map(Line::plain).collect();
+        assert_eq!(
+            text,
+            vec![
+                opening.to_owned(),
+                opening.to_owned(),
+                // The character the ceiling split is dropped, not the chapter.
+                "Δε".to_owned(),
+                // The next chapter is under the ceiling and reads whole.
+                "And it continued.".to_owned(),
+            ]
+        );
+        assert!(book.truncated, "the book holds more than was read");
 
         let _ = std::fs::remove_file(path);
     }
