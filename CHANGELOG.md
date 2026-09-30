@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-09-30
+
 ### Changed
 
 - Rebuilt against the current COSMIC libraries (libcosmic `6af8b70`).
@@ -236,7 +238,8 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
-[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/Magnetar-OS/peek/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/Magnetar-OS/peek/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/Magnetar-OS/peek/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/Magnetar-OS/peek/compare/v1.0.1...v2.0.0
