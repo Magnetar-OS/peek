@@ -1,2 +1,7 @@
 /target
 .release-kit/
+# `just flatpak-sources` output and flatpak-builder's working directories.
+/packaging/flatpak/flatpak-cargo-generator.py
+/packaging/flatpak/generated-sources.json
+/packaging/flatpak/.flatpak-builder/
+/packaging/flatpak/build/

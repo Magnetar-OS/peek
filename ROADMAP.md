@@ -108,8 +108,11 @@ from wherever the user's cursor is. This milestone is integration, not pixels.
 - **Flatpak, and the stores.** *Manifest written* at
   `packaging/flatpak/`, with the sandbox trade-offs argued in its comments; the
   poppler checksum is real (26.08.0) and `just flatpak-sources` generates the
-  crate sources. It needs a first `flatpak-builder` run and a Flathub
-  submission. `nfpm` covers deb and rpm; a Flatpak
+  crate sources. *Built* on 2026-09-30 with flatpak-builder at user scope
+  against the 26.08 runtime; `--help`, `--version` and a PDF thumbnail were
+  run inside the sandbox. The overlay itself has not been run from the
+  Flatpak in a COSMIC session, and the Flathub submission is still to do.
+  `nfpm` covers deb and rpm; a Flatpak
   manifest brings Flathub and the COSMIC Store. The layer-shell surface and
   the D-Bus names need portal-era scrutiny here — this is where sandboxing
   assumptions get found, not papered over.

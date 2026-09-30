@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The Flatpak manifest builds. Built for the first time, at user scope
+  against the 26.08 runtime, it needed four things: the checkout's `target`
+  directory and flatpak-builder's own working directories are left out of
+  the source copy instead of being copied into the build; the build accepts
+  the SDK's compiler being a patch release behind the one the workspace
+  pins; `poppler-data` is built, so PDFs in CJK encodings keep their text;
+  and the man pages and example plugins are installed as the packages
+  install them. Poppler's headers and introspection data are no longer
+  shipped.
+
 ### Fixed
 
 - A long EPUB chapter or DOCX/ODT document is read up to a size ceiling, and

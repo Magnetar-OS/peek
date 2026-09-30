@@ -43,7 +43,27 @@ finish-args:
   # Settings live in cosmic-config, which is read through the session bus.
   - --talk-name=com.system76.CosmicSettingsDaemon
 
+# What poppler installs for building against it. Nothing at run time reads a
+# header, a pkg-config file or introspection data.
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/pkgconfig
+  - /lib/girepository-1.0
+  - /share/gir-1.0
+
 modules:
+  - name: poppler-data
+    # The encoding tables poppler reads at run time. Without them a PDF in a
+    # CJK encoding renders with its text missing; every distribution's
+    # poppler package depends on this for the same reason.
+    buildsystem: cmake-ninja
+    sources:
+      - type: archive
+        url: https://poppler.freedesktop.org/poppler-data-0.4.12.tar.gz
+        # Computed from the release tarball downloaded on 2026-09-30.
+        sha256: c835b640a40ce357e1b83666aabd95edffa24ddddd49b8daff63adb851cdab74
+
   - name: poppler
     # The PDF renderer. Not in the freedesktop runtime, and the reason the
     # whole workspace is GPL — see the workspace manifest.
@@ -67,7 +87,12 @@ modules:
     buildsystem: simple
     build-commands:
       - cargo --offline fetch --manifest-path Cargo.toml --verbose
-      - cargo --offline build --release --workspace
+      # `--ignore-rust-version`: the workspace asks for the compiler its own
+      # toolchain file pins, and the SDK's rust-stable extension can be a
+      # patch release behind it — 1.98.0 against 1.98.1 when this was first
+      # built. A patch release adds no language features, so the build is the
+      # same; without the flag cargo refuses to start.
+      - cargo --offline build --release --workspace --ignore-rust-version
       - install -Dm0755 target/release/magnetar-peek /app/bin/magnetar-peek
       - install -Dm0755 target/release/peek-thumbnailer /app/bin/peek-thumbnailer
       - install -Dm0644 res/com.magnetaros.Peek.desktop /app/share/applications/com.magnetaros.Peek.desktop
@@ -76,10 +101,24 @@ modules:
       - install -Dm0644 res/icons/hicolor/scalable/apps/com.magnetaros.Peek.svg /app/share/icons/hicolor/scalable/apps/com.magnetaros.Peek.svg
       - install -Dm0644 res/icons/hicolor/symbolic/apps/com.magnetaros.Peek-symbolic.svg /app/share/icons/hicolor/symbolic/apps/com.magnetaros.Peek-symbolic.svg
       - for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do install -Dm0644 "res/icons/hicolor/$size/apps/com.magnetaros.Peek.png" "/app/share/icons/hicolor/$size/apps/com.magnetaros.Peek.png"; done
+      - install -Dm0644 res/man/magnetar-peek.1 /app/share/man/man1/magnetar-peek.1
+      - install -Dm0644 res/man/peek-thumbnailer.1 /app/share/man/man1/peek-thumbnailer.1
       - install -Dm0644 res/plugins/README.md /app/share/peek/plugins/README.md
+      - install -Dm0644 res/plugins/com.magnetaros.Peek.example-command.toml /app/share/peek/plugins/com.magnetaros.Peek.example-command.toml.example
+      - install -Dm0644 res/plugins/com.magnetaros.Peek.example-text.toml /app/share/peek/plugins/com.magnetaros.Peek.example-text.toml.example
     sources:
       - type: dir
         path: ../..
+        # A `dir` source copies the whole checkout into the build. Without
+        # this it takes the cargo target directory with it — tens of
+        # gigabytes — and, when flatpak-builder is run from this directory as
+        # the README says, its own state and build directories, recursively.
+        skip:
+          - target
+          - .git
+          - .release-kit
+          - packaging/flatpak/.flatpak-builder
+          - packaging/flatpak/build
       # Generated from Cargo.lock by `just flatpak-sources`; not checked in
       # because it is generated and enormous. See README.md beside this file.
       - generated-sources.json
