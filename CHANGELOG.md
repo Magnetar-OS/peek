@@ -17,6 +17,7 @@ All notable changes to this project are documented here. The format follows
   and the man pages and example plugins are installed as the packages
   install them. Poppler's headers and introspection data are no longer
   shipped.
+- `peek-engine` 2.0.1 (prepared, not yet published) carries the fix below.
 
 ### Fixed
 

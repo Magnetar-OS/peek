@@ -64,7 +64,7 @@ off.
 
 ```toml
 # Type detection, images, text, archives — no C libraries, builds anywhere.
-peek-engine = { version = "0.1", default-features = false }
+peek-engine = { version = "2", default-features = false }
 ```
 
 Detection is deliberately *not* gated. `Kind` still names a PDF as a PDF with
