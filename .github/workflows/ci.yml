@@ -30,8 +30,12 @@ jobs:
             libxkbcommon-dev libwayland-dev libinput-dev libudev-dev \
             desktop-file-utils appstream shared-mime-info
 
-      - name: Install Rust
-        run: rustup update stable && rustup default stable
+      # rustup reads rust-toolchain.toml on the first cargo invocation and
+      # installs the pinned channel with its components. No toolchain action
+      # needed, and none wanted: an action pinning its own default would
+      # silently override the file.
+      - name: Show the pinned toolchain
+        run: rustup show
 
       - uses: Swatinem/rust-cache@v2
 
