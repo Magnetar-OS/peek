@@ -88,10 +88,15 @@ modules:
     build-commands:
       - cargo --offline fetch --manifest-path Cargo.toml --verbose
       # `--ignore-rust-version`: the workspace asks for the compiler its own
-      # toolchain file pins, and the SDK's rust-stable extension can be a
-      # patch release behind it — 1.98.0 against 1.98.1 when this was first
-      # built. A patch release adds no language features, so the build is the
-      # same; without the flag cargo refuses to start.
+      # toolchain file pins, and the SDK's rust-stable extension trails it —
+      # 1.98.0 against 1.98.1 when this was first built, and still 1.98.0 on
+      # 2026-10-03, now a minor release behind the pinned 1.99.0. Without the
+      # flag cargo refuses to start. With it the build rests on the code not
+      # using anything newer than the extension has, which is checked rather
+      # than guaranteed: `cargo +1.98.0 check --workspace
+      # --ignore-rust-version --locked` passed on that date, and no
+      # dependency asks for more than 1.96. Code that does need the newer
+      # compiler fails here with a compile error until the extension moves.
       - cargo --offline build --release --workspace --ignore-rust-version
       - install -Dm0755 target/release/magnetar-peek /app/bin/magnetar-peek
       - install -Dm0755 target/release/peek-thumbnailer /app/bin/peek-thumbnailer
