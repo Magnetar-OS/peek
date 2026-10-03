@@ -513,7 +513,7 @@ mod tests {
 
         let document = load(&path, true).expect("loads");
         assert!(document.lossy);
-        assert!(!document.lines.is_empty());
+        assert_ne!(document.lines, []);
 
         let _ = std::fs::remove_file(path);
     }

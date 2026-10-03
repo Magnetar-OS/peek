@@ -159,12 +159,15 @@ mod tests {
 
     #[test]
     fn flags_are_not_treated_as_files() {
-        assert!(resolve(&["--verbose".to_owned()]).is_empty());
+        assert_eq!(resolve(&["--verbose".to_owned()]), Vec::<String>::new());
     }
 
     #[test]
     fn missing_files_are_dropped_rather_than_forwarded() {
-        assert!(resolve(&["/nonexistent/peek/file.png".to_owned()]).is_empty());
+        assert_eq!(
+            resolve(&["/nonexistent/peek/file.png".to_owned()]),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

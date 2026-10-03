@@ -163,7 +163,7 @@ mod tests {
         assert!((1..=9).contains(&specimen.stretch));
         assert!(specimen.glyphs > 0);
         assert!(specimen.faces >= 1);
-        assert!(!specimen.data.is_empty());
+        assert_ne!(specimen.data, b"");
     }
 
     #[test]

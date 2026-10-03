@@ -1598,7 +1598,7 @@ mod tests {
             // A missing catalogue entry renders as the message id, which is
             // kebab-case and would ship as a visible label.
             assert!(!text.contains("reason-"), "unresolved text for {reason:?}");
-            assert!(!text.is_empty());
+            assert_ne!(text, "");
         }
     }
 
@@ -1628,7 +1628,7 @@ mod tests {
             // A missing catalogue entry renders as the message id, which is
             // kebab-case and would otherwise ship as a visible label.
             assert!(!label.contains('-'), "unresolved label for {field:?}");
-            assert!(!label.is_empty());
+            assert_ne!(label, "");
         }
     }
 

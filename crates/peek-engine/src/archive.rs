@@ -396,7 +396,7 @@ mod tests {
     fn an_empty_tar_lists_as_empty() {
         // Two zero blocks are a valid, empty tar.
         let archive = tar_stream(std::io::Cursor::new(vec![0u8; 1024]), "Tar").expect("lists");
-        assert!(archive.members.is_empty());
+        assert_eq!(archive.members, []);
         assert!(!archive.truncated);
     }
 
@@ -448,7 +448,7 @@ mod tests {
     fn an_empty_compressed_tar_is_still_a_tar() {
         let path = gzipped("peek-test-archive-empty.tar.gz", &[0u8; 1024]);
         let archive = list(&path, "application/gzip").expect("lists");
-        assert!(archive.members.is_empty());
+        assert_eq!(archive.members, []);
         let _ = std::fs::remove_file(path);
     }
 
