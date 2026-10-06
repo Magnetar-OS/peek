@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `magnetar-peek` says why and exits with status 1 when the compositor does
+  not offer the layer-shell protocol to it. It started, stayed resident,
+  showed nothing and logged nothing. This is what happens to the Flatpak on
+  COSMIC, which withholds layer-shell from sandboxed applications, and on any
+  compositor without the protocol.
+
 ## [2.2.2] - 2026-10-03
 
 ### Changed

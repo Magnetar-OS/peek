@@ -42,7 +42,7 @@ The first invocation becomes a daemon and stays resident, so binding
 }
 
 fn main() -> cosmic::iced::Result {
-    init_logging();
+    let journal = init_logging();
     localize::localize();
 
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -57,6 +57,19 @@ fn main() -> cosmic::iced::Result {
     {
         println!("{COMMAND} {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
+    }
+
+    // The overlay is a layer surface and nothing else, and a request for one
+    // that the compositor does not grant is dropped without a word. So ask
+    // first: a previewer that cannot show anything says why and stops, rather
+    // than staying resident behind a key that does nothing.
+    if surface::layer_shell_offered() == Some(false) {
+        tracing::error!("{}", surface::NO_LAYER_SHELL);
+        // The log may be the journal, and this was typed at a terminal.
+        if journal {
+            eprintln!("{COMMAND}: {}", surface::NO_LAYER_SHELL);
+        }
+        std::process::exit(1);
     }
 
     let paths = resolve(&arguments);
@@ -83,14 +96,14 @@ fn main() -> cosmic::iced::Result {
     cosmic::app::run_single_instance::<app::App>(settings, app::Flags::new(paths))
 }
 
-/// Set up logging.
+/// Set up logging. Returns whether the log is the journal rather than stderr.
 ///
 /// The journal first, and stderr only when there is no journal to write to.
 /// Most of this daemon's life is spent started by D-Bus activation or by a
 /// desktop entry, and in both cases its stderr goes somewhere the user will
 /// never look — which is the same as not logging at all. `journalctl --user -t
 /// peek` is somewhere they can look.
-fn init_logging() {
+fn init_logging() -> bool {
     use tracing_subscriber::layer::SubscriberExt as _;
     use tracing_subscriber::util::SubscriberInitExt as _;
 
@@ -107,6 +120,7 @@ fn init_logging() {
             .with(journal)
             .with(filter)
             .init();
+        true
     } else {
         tracing_subscriber::registry()
             .with(
@@ -118,6 +132,7 @@ fn init_logging() {
             )
             .with(filter)
             .init();
+        false
     }
 }
 

@@ -26,6 +26,60 @@ use peek_engine::Preview;
 
 use crate::config::Config;
 
+/// The Wayland global the overlay is made through.
+const LAYER_SHELL: &str = "zwlr_layer_shell_v1";
+
+/// What to say when the compositor does not offer [`LAYER_SHELL`].
+pub const NO_LAYER_SHELL: &str = "the compositor does not offer the layer-shell protocol \
+     (zwlr_layer_shell_v1) to this process, so there is nothing to draw the preview on. \
+     A compositor may withhold it from a sandboxed application: COSMIC does, which is why \
+     the Flatpak cannot show a preview there. Use the native package.";
+
+/// Whether the compositor offers layer-shell to this process.
+///
+/// The toolkit asks for a layer surface and drops the answer when the global
+/// is missing, so a compositor without it — or one that withholds it from
+/// this process, as COSMIC does from anything Flatpak has sandboxed — leaves
+/// a daemon that started, shows nothing, and says nothing. Asking the
+/// registry directly, once, before any of that, is what lets the command
+/// refuse out loud instead.
+///
+/// `None` when there is no compositor to ask. That is not this function's
+/// failure to report: the toolkit fails on it by itself, with its own error.
+#[must_use]
+pub fn layer_shell_offered() -> Option<bool> {
+    use cosmic::cctk::wayland_client::globals::{GlobalListContents, registry_queue_init};
+    use cosmic::cctk::wayland_client::protocol::wl_registry::{Event, WlRegistry};
+    use cosmic::cctk::wayland_client::{Connection, Dispatch, QueueHandle};
+
+    /// Receives nothing: the list `registry_queue_init` returns is all of it.
+    struct Probe;
+    impl Dispatch<WlRegistry, GlobalListContents> for Probe {
+        fn event(
+            _: &mut Self,
+            _: &WlRegistry,
+            _: Event,
+            _: &GlobalListContents,
+            _: &Connection,
+            _: &QueueHandle<Self>,
+        ) {
+        }
+    }
+
+    let connection = Connection::connect_to_env().ok()?;
+    let (globals, _queue) = registry_queue_init::<Probe>(&connection).ok()?;
+    Some(globals.contents().with_list(|globals| {
+        offers_layer_shell(globals.iter().map(|global| global.interface.as_str()))
+    }))
+}
+
+/// Whether a compositor's globals include the one the overlay needs.
+fn offers_layer_shell<'a>(interfaces: impl IntoIterator<Item = &'a str>) -> bool {
+    interfaces
+        .into_iter()
+        .any(|interface| interface == LAYER_SHELL)
+}
+
 /// Height of the header strip: file name, type, and the actions.
 pub const HEADER_HEIGHT: f32 = 60.0;
 
@@ -424,6 +478,20 @@ pub fn set_blur(id: window::Id, panel: Rectangle, enabled: bool) -> Task<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The globals cosmic-comp 1.9.0 advertised to the Flatpak on 2026-10-06
+    /// had everything an ordinary window needs and no layer-shell; the same
+    /// compositor offers it to a process that is not sandboxed.
+    #[test]
+    fn a_compositor_without_layer_shell_is_recognised() {
+        let sandboxed = ["wl_compositor", "wl_shm", "xdg_wm_base", "wl_seat"];
+        assert!(!offers_layer_shell(sandboxed));
+        assert!(offers_layer_shell(
+            sandboxed.into_iter().chain(["zwlr_layer_shell_v1"])
+        ));
+        // A different shell with a similar name is not this one.
+        assert!(!offers_layer_shell(["ext_layer_shell_v1"]));
+    }
 
     fn screen() -> Size {
         Size::new(1920.0, 1080.0)
