@@ -13,6 +13,17 @@ All notable changes to this project are documented here. The format follows
   showed nothing and logged nothing. This is what happens to the Flatpak on
   COSMIC, which withholds layer-shell from sandboxed applications, and on any
   compositor without the protocol.
+- Flatpak: a setting changed in the panel is kept. The sandbox could read
+  the settings and not write them, and on a system where Peek had never run
+  it could not open them at all. Its own settings directory is now the one
+  host path it may write to.
+
+### Changed
+
+- Flatpak: the manifest no longer asks to talk to
+  `org.freedesktop.portal.OpenURI`, which is not a bus name; "Open" reaches
+  the portal without it. `packaging/flatpak/README.md` lists what the sandbox
+  changes, first of all that the Flatpak cannot show a preview on COSMIC.
 
 ## [2.2.2] - 2026-10-03
 

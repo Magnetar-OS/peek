@@ -5,15 +5,19 @@
 #
 #   * It maps a `wlr-layer-shell` surface, which the portal has no equivalent
 #     for — `--socket=wayland` plus the layer-shell protocol is the only way an
-#     overlay above the panel exists at all.
+#     overlay above the panel exists at all. That depends on the compositor
+#     offering layer-shell to a sandboxed client, and COSMIC does not: there
+#     this Flatpak builds, installs, and cannot show a preview (see "Known
+#     limits" in README.md beside this file).
 #   * It is pointed at whatever file the user selected, from a file manager
 #     running outside the sandbox. A document portal handle would work for a
 #     file the user picked in a dialog; a previewer never opens a dialog. So it
 #     reads the host filesystem, read-only.
 #   * It serves `org.gnome.NautilusPreviewer2` so the space bar reaches it.
 #
-# Nothing here is write access: `peek` renders files and never modifies them,
-# which is the one property that makes read-only host access defensible.
+# Nothing here is write access to the user's files: `peek` renders files and
+# never modifies them, which is the one property that makes read-only host
+# access defensible. The one writable path is its own settings directory.
 app-id: com.magnetaros.Peek
 runtime: org.freedesktop.Platform
 runtime-version: '26.08'
@@ -35,12 +39,22 @@ finish-args:
   - --device=dri
   # Read-only, and the reason is above.
   - --filesystem=host:ro
+  # Its own settings, and only those, read-write. cosmic-config reads and
+  # writes the host's `~/.config/cosmic/<app id>/` from inside a Flatpak
+  # (`HOST_XDG_CONFIG_HOME`), which `host:ro` makes read-only: without this
+  # a setting changed in the panel is gone at the next start, and on a host
+  # where the directory does not exist yet the settings cannot be opened at
+  # all. `:create` makes it on first run.
+  - --filesystem=xdg-config/cosmic/com.magnetaros.Peek:create
   # The previewer interface the file manager calls, and the name peek owns.
   - --own-name=org.gnome.NautilusPreviewer
   - --own-name=com.magnetaros.Peek
-  # Opening a file in its real application has to leave the sandbox.
-  - --talk-name=org.freedesktop.portal.OpenURI
-  # Settings live in cosmic-config, which is read through the session bus.
+  # Opening a file in its real application leaves the sandbox through the
+  # OpenURI portal, which every Flatpak may call: `xdg-open` in the runtime
+  # goes there, and it needs no permission here.
+  #
+  # Settings are files, read as above; the settings daemon is how a change
+  # to one is noticed while the previewer is running.
   - --talk-name=com.system76.CosmicSettingsDaemon
 
 # What poppler installs for building against it. Nothing at run time reads a
@@ -94,7 +108,8 @@ modules:
       # flag cargo refuses to start. With it the build rests on the code not
       # using anything newer than the extension has, which is checked rather
       # than guaranteed: `cargo +1.98.0 check --workspace
-      # --ignore-rust-version --locked` passed on that date, and no
+      # --ignore-rust-version --locked` passed on that date, this whole
+      # release build passed on the extension's 1.98.0 on 2026-10-06, and no
       # dependency asks for more than 1.96. Code that does need the newer
       # compiler fails here with a compile error until the extension moves.
       - cargo --offline build --release --workspace --ignore-rust-version
