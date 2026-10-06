@@ -110,8 +110,13 @@ from wherever the user's cursor is. This milestone is integration, not pixels.
   poppler checksum is real (26.08.0) and `just flatpak-sources` generates the
   crate sources. *Built* on 2026-09-30 with flatpak-builder at user scope
   against the 26.08 runtime; `--help`, `--version` and a PDF thumbnail were
-  run inside the sandbox. The overlay itself has not been run from the
-  Flatpak in a COSMIC session, and the Flathub submission is still to do.
+  run inside the sandbox. *Run in a COSMIC session* on 2026-10-06, and it
+  cannot show a preview there: cosmic-comp withholds layer-shell from
+  sandboxed clients, so the overlay has no surface to be. `magnetar-peek` now
+  says so and exits instead of staying resident behind nothing. The previewer
+  bus name is claimed and released from inside the sandbox as the setting
+  says. A Flathub submission waits on whether a Flatpak that cannot work on
+  COSMIC is wanted at all; see `packaging/flatpak/README.md`.
   `nfpm` covers deb and rpm; a Flatpak
   manifest brings Flathub and the COSMIC Store. The layer-shell surface and
   the D-Bus names need portal-era scrutiny here — this is where sandboxing
