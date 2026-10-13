@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-10-13
+
 ### Fixed
 
 - `magnetar-peek` says why and exits with status 1 when the compositor does
@@ -264,7 +266,8 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
-[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.2.2...HEAD
+[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.2.3...HEAD
+[2.2.3]: https://github.com/Magnetar-OS/peek/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/Magnetar-OS/peek/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/Magnetar-OS/peek/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/Magnetar-OS/peek/compare/v2.1.0...v2.2.0
