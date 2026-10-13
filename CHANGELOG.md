@@ -20,6 +20,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Rebuilt against the current COSMIC libraries (libcosmic `a6ac45c`).
 - Flatpak: the manifest no longer asks to talk to
   `org.freedesktop.portal.OpenURI`, which is not a bus name; "Open" reaches
   the portal without it. `packaging/flatpak/README.md` lists what the sandbox
