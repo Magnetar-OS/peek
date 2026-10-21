@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `peek-engine` 2.1.0 (prepared, not yet published): archives are read with
+  zip 9, sevenz-rust2 0.24 and lzma-rust2 0.23, and the minimum supported Rust
+  version is 1.99.1. No API change; a minor version because the minimum Rust
+  version rose.
+
 ## [2.2.4] - 2026-10-21
 
 ### Changed
