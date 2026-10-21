@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Rebuilt against the current COSMIC libraries (libcosmic `430f3d4`) with
+  Rust 1.99.1.
+
 ## [2.2.3] - 2026-10-13
 
 ### Fixed

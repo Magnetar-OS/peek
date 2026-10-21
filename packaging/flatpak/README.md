@@ -43,9 +43,10 @@ version moves, download the new tarball and replace both together.
 The build passes `--ignore-rust-version` to cargo. The workspace asks for the
 compiler its toolchain pins, and the SDK's `rust-stable` extension trails it:
 1.98.0 against 1.98.1 on 2026-09-30, and still 1.98.0 on 2026-10-03, a minor
-release behind the pinned 1.99.0. The flag only skips cargo's version check,
-so the code still has to compile on the extension's compiler. Check that
-before building, with the same release from rustup:
+release behind the 1.99.0 pinned then (the pin is 1.99.1 now). The flag only
+skips cargo's version check, so the code still has to compile on the
+extension's compiler. Check that before building, with the same release from
+rustup:
 
 ```sh
 cargo +1.98.0 check --workspace --ignore-rust-version --locked

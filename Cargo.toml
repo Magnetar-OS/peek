@@ -6,7 +6,7 @@ members = ["crates/peek-engine", "crates/peek-thumbnailer"]
 edition = "2024"
 # The channel `rust-toolchain.toml` pins: the compiler the Magnetar suite is
 # built and released with. Raise both together.
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 repository = "https://github.com/Magnetar-OS/peek"
 # Poppler, the only PDF renderer actually shipped on a Linux desktop, is GPL.
 # That decides the licence for the whole workspace including the engine crate —

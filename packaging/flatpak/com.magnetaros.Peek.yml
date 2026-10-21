@@ -104,9 +104,10 @@ modules:
       # `--ignore-rust-version`: the workspace asks for the compiler its own
       # toolchain file pins, and the SDK's rust-stable extension trails it —
       # 1.98.0 against 1.98.1 when this was first built, and still 1.98.0 on
-      # 2026-10-03, now a minor release behind the pinned 1.99.0. Without the
-      # flag cargo refuses to start. With it the build rests on the code not
-      # using anything newer than the extension has, which is checked rather
+      # 2026-10-03, a minor release behind the 1.99.0 pinned then (the pin is
+      # 1.99.1 now). Without the flag cargo refuses to start. With it the
+      # build rests on the code not using anything newer than the extension
+      # has, which is checked rather
       # than guaranteed: `cargo +1.98.0 check --workspace
       # --ignore-rust-version --locked` passed on that date, this whole
       # release build passed on the extension's 1.98.0 on 2026-10-06, and no
