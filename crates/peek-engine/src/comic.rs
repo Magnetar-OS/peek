@@ -112,9 +112,18 @@ pub fn render(path: &Path, page: usize, target: u32) -> Result<Comic, Error> {
     (&mut entry)
         .take(size + 1)
         .read_to_end(&mut bytes)
-        .map_err(|source| Error::Io {
-            path: path.display().to_string(),
-            source,
+        .map_err(|source| {
+            // zip enforces the declared size itself now, and reports the lie —
+            // like a corrupt stream — as invalid data: the archive is damaged,
+            // the disk is fine.
+            if source.kind() == std::io::ErrorKind::InvalidData {
+                Error::Damaged(format!("page {page}: {source}"))
+            } else {
+                Error::Io {
+                    path: path.display().to_string(),
+                    source,
+                }
+            }
         })?;
     if bytes.len() as u64 > size {
         return Err(Error::Damaged(format!(
@@ -142,7 +151,9 @@ fn page_names<R: std::io::Read + std::io::Seek>(archive: &mut zip::ZipArchive<R>
             if entry.is_dir() {
                 return None;
             }
-            let name = entry.name();
+            // A page is opened again by this name, so one that cannot be
+            // decoded could not be shown anyway.
+            let name = entry.name().ok()?;
 
             // Resource forks and hidden files are bookkeeping, not pages.
             if name.starts_with("__MACOSX/")
@@ -157,7 +168,7 @@ fn page_names<R: std::io::Read + std::io::Seek>(archive: &mut zip::ZipArchive<R>
             let extension = name.rsplit('.').next()?.to_lowercase();
             PAGE_EXTENSIONS
                 .contains(&extension.as_str())
-                .then(|| name.to_owned())
+                .then(|| name.into_owned())
         })
         .collect()
 }
@@ -172,7 +183,7 @@ mod tests {
         let path = std::env::temp_dir().join(name);
         let file = std::fs::File::create(&path).expect("create");
         let mut writer = zip::ZipWriter::new(file);
-        let options: zip::write::FileOptions<'_, ()> =
+        let options: zip::write::FileOptions<'_, '_, ()> =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
         // Named so lexicographic order would be wrong: page 10 before page 2.
@@ -233,7 +244,7 @@ mod tests {
         {
             let file = std::fs::File::create(&path).expect("create");
             let mut writer = zip::ZipWriter::new(file);
-            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+            let options: zip::write::FileOptions<'_, '_, ()> = zip::write::FileOptions::default();
             writer.start_file("notes.txt", options).expect("start");
             writer.write_all(b"no pages here").expect("write");
             writer.finish().expect("finish");
@@ -268,7 +279,7 @@ mod tests {
         {
             let file = std::fs::File::create(&path).expect("create");
             let mut writer = zip::ZipWriter::new(file);
-            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default()
+            let options: zip::write::FileOptions<'_, '_, ()> = zip::write::FileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated);
             writer.start_file("page1.png", options).expect("start");
             writer.write_all(&vec![0u8; 1024 * 1024]).expect("write");

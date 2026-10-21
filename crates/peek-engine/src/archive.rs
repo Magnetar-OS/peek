@@ -196,7 +196,12 @@ fn zip(path: &Path, format: &str) -> Result<Archive, Error> {
         let size = entry.size();
         total_size += size;
         members.push(Member {
-            name: entry.name().to_owned(),
+            // A name that is neither UTF-8 nor decodable as CP437 is still a
+            // member worth listing; its bytes are shown as best they can be.
+            name: entry.name().map_or_else(
+                |_| String::from_utf8_lossy(entry.name_raw()).into_owned(),
+                std::borrow::Cow::into_owned,
+            ),
             size,
             compressed: Some(entry.compressed_size()),
             is_dir: entry.is_dir(),

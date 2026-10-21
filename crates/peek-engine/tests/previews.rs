@@ -205,7 +205,7 @@ fn a_zip_lists_its_members_without_extracting_them() {
     {
         let file = std::fs::File::create(&path).expect("create the zip");
         let mut writer = zip::ZipWriter::new(file);
-        let options: zip::write::FileOptions<'_, ()> =
+        let options: zip::write::FileOptions<'_, '_, ()> =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
         writer

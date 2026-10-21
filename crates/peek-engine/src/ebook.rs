@@ -431,7 +431,7 @@ mod tests {
         let path = std::env::temp_dir().join(name);
         let file = std::fs::File::create(&path).expect("create");
         let mut writer = zip::ZipWriter::new(file);
-        let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+        let options: zip::write::FileOptions<'_, '_, ()> = zip::write::FileOptions::default();
 
         let mut add = |name: &str, content: &[u8]| {
             writer.start_file(name, options).expect("start");
@@ -561,7 +561,7 @@ mod tests {
         {
             let file = std::fs::File::create(&path).expect("create");
             let mut writer = zip::ZipWriter::new(file);
-            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+            let options: zip::write::FileOptions<'_, '_, ()> = zip::write::FileOptions::default();
             writer.start_file("whatever.txt", options).expect("start");
             writer.write_all(b"not a book").expect("write");
             writer.finish().expect("finish");

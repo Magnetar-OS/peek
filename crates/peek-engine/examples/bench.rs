@@ -228,7 +228,7 @@ impl Fixtures {
         let path = self.0.join("bundle.zip");
         let file = std::fs::File::create(&path).expect("create the zip");
         let mut writer = zip::ZipWriter::new(file);
-        let options: zip::write::FileOptions<'_, ()> =
+        let options: zip::write::FileOptions<'_, '_, ()> =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
         for member in 0..500 {
