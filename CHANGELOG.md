@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-11-01
+
 ### Fixed
 
 - The header and transport buttons keep a header bar's size at Spacious
@@ -296,7 +298,8 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
-[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/Magnetar-OS/peek/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/Magnetar-OS/peek/compare/v2.2.4...v2.3.0
 [2.2.4]: https://github.com/Magnetar-OS/peek/compare/v2.2.3...v2.2.4
 [2.2.3]: https://github.com/Magnetar-OS/peek/compare/v2.2.2...v2.2.3
