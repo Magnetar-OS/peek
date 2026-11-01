@@ -9,6 +9,14 @@ app-keywords = preview;quicklook;quick look;view;peek;
 open = Open
 copy-path = Copy path
 fullscreen = Fullscreen
+# Tooltips of the header and transport buttons.
+zoom-out = Zoom out
+zoom-in = Zoom in
+settings = Settings
+close = Close
+back = Back
+play = Play
+pause = Pause
 index-sheet = All files
 no-file = No file
 loading = Loading…

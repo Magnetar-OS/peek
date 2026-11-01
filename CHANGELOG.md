@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The header and transport buttons keep a header bar's size at Spacious
+  interface density, where they used to grow by 8px each and squeeze the
+  file name to a few characters at the panel's narrowest.
+- Every icon button has a tooltip naming what it does, which is also its
+  accessible name.
+
 ## [2.3.0] - 2026-11-01
 
 ### Changed

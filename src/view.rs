@@ -27,7 +27,7 @@ use cosmic::iced::widget::text::{LineHeight, Wrapping};
 use cosmic::iced::widget::{pin, rich_text, space, span};
 use cosmic::iced::{Alignment, Background, Color, ContentFit, Length, Size, Vector};
 use cosmic::widget::{
-    button, column, container, icon, image, mouse_area, row, scrollable, slider, text,
+    self, button, column, container, icon, image, mouse_area, row, scrollable, slider, text,
 };
 use cosmic::{Apply, Element};
 use peek_engine::preview::Reason;
@@ -536,29 +536,52 @@ fn actions<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
         return controls
             .push(action_button(
                 "go-previous-symbolic",
+                fl!("back"),
                 Message::ToggleSettings,
             ))
-            .push(action_button("window-close-symbolic", Message::Dismiss))
+            .push(action_button(
+                "window-close-symbolic",
+                fl!("close"),
+                Message::Dismiss,
+            ))
             .into();
     }
 
     // Zoom is only meaningful where there is something to scale.
     if frame.preview.is_visual() {
         controls = controls
-            .push(action_button("zoom-out-symbolic", Message::Zoom(0.8)))
-            .push(action_button("zoom-in-symbolic", Message::Zoom(1.25)));
+            .push(action_button(
+                "zoom-out-symbolic",
+                fl!("zoom-out"),
+                Message::Zoom(0.8),
+            ))
+            .push(action_button(
+                "zoom-in-symbolic",
+                fl!("zoom-in"),
+                Message::Zoom(1.25),
+            ));
     }
 
     if frame.entry.is_some() {
         controls = controls
-            .push(action_button("edit-copy-symbolic", Message::CopyPath))
+            .push(action_button(
+                "edit-copy-symbolic",
+                fl!("copy-path"),
+                Message::CopyPath,
+            ))
             .push(action_button(
                 "view-fullscreen-symbolic",
+                fl!("fullscreen"),
                 Message::ToggleFullscreen,
             ))
-            .push(action_button("view-grid-symbolic", Message::ToggleGrid))
+            .push(action_button(
+                "view-grid-symbolic",
+                fl!("index-sheet"),
+                Message::ToggleGrid,
+            ))
             .push(action_button(
                 "emblem-system-symbolic",
+                fl!("settings"),
                 Message::ToggleSettings,
             ))
             .push(
@@ -569,7 +592,11 @@ fn actions<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
     }
 
     controls
-        .push(action_button("window-close-symbolic", Message::Dismiss))
+        .push(action_button(
+            "window-close-symbolic",
+            fl!("close"),
+            Message::Dismiss,
+        ))
         .apply(container)
         // Buttons carry their own theming and cannot be faded the way drawn
         // colours are, so the whole strip is simply hidden until the panel has
@@ -584,11 +611,25 @@ fn actions<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
         })
 }
 
-fn action_button<'a>(name: &'a str, message: Message) -> Element<'a, Message> {
-    button::icon(icon::from_name(name).size(16))
-        .on_press(message)
-        .class(cosmic::theme::Button::Icon)
-        .into()
+/// An icon button for the header or the transport strip, named by its
+/// tooltip.
+///
+/// Sized like a header bar's buttons, with a fixed 8px padding rather than
+/// `button::icon`'s density-dependent one: at Spacious that is 12px, the
+/// header's seven buttons grow by 56px between them, and the file name —
+/// the one thing in the header that says what is being previewed — is left
+/// a few characters at the panel's minimum width.
+fn action_button<'a>(name: &'a str, label: String, message: Message) -> Element<'a, Message> {
+    widget::tooltip(
+        button::icon(icon::from_name(name))
+            .icon_size(16)
+            .padding(8)
+            .on_press(message)
+            .class(cosmic::theme::Button::Icon),
+        text::body(label),
+        widget::tooltip::Position::Bottom,
+    )
+    .into()
 }
 
 /// The body of the panel, dispatched on what the preview turned out to be.
@@ -1455,6 +1496,7 @@ fn transport<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
             } else {
                 "media-playback-start-symbolic"
             },
+            if playing { fl!("pause") } else { fl!("play") },
             Message::TogglePlay,
         ))
         .push(

@@ -103,7 +103,7 @@ pub const READING_WIDTH: f32 = 920.0;
 /// Smallest panel the previewer will draw.
 ///
 /// Set by the header, not by the content: the icon, a legible amount of file
-/// name, and the four buttons have to fit on one line, and a 16×16 icon
+/// name, and the header buttons have to fit on one line, and a 16×16 icon
 /// previewed at its natural size would otherwise produce a panel narrower than
 /// its own title bar.
 const MIN_WIDTH: f32 = 520.0;
