@@ -4697,7 +4697,7 @@ dependencies = [
 
 [[package]]
 name = "peek-engine"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "blake3",
  "bzip2",

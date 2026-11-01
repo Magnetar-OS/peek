@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- peek-engine 3.0.1 is on crates.io with the raised requirements: lzma-rust2
+  0.25, pulldown-cmark 0.13.6 and tokio 1.54. 3.0.0 had been published with
+  the old ones.
+
 ## [2.3.2] - 2026-11-01
 
 ### Changed
