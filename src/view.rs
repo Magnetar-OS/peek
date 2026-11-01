@@ -611,8 +611,8 @@ fn actions<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
         })
 }
 
-/// An icon button for the header or the transport strip, named by its
-/// tooltip.
+/// An icon button for the header or the transport strip, its label both its
+/// tooltip and its accessible name.
 ///
 /// Sized like a header bar's buttons, with a fixed 8px padding rather than
 /// `button::icon`'s density-dependent one: at Spacious that is 12px, the
@@ -624,6 +624,7 @@ fn action_button<'a>(name: &'a str, label: String, message: Message) -> Element<
         button::icon(icon::from_name(name))
             .icon_size(16)
             .padding(8)
+            .name(label.clone())
             .on_press(message)
             .class(cosmic::theme::Button::Icon),
         text::body(label),
