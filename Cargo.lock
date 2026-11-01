@@ -3901,6 +3901,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lzma-rust2"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1d73c59a56771343712b22ea5615092c612c16ba291c0979e3105dfeec4890"
+dependencies = [
+ "sha2",
+]
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4704,7 +4713,7 @@ dependencies = [
  "image",
  "kamadak-exif",
  "lofty",
- "lzma-rust2",
+ "lzma-rust2 0.25.0",
  "poppler-rs",
  "pulldown-cmark",
  "quick-xml 0.42.0",
@@ -5847,7 +5856,7 @@ checksum = "30146010a60b5773ef63f7b0033576c7a0487ecc87a30d97b787ca8e27c85140"
 dependencies = [
  "crc32fast",
  "js-sys",
- "lzma-rust2",
+ "lzma-rust2 0.23.0",
  "wasm-bindgen",
 ]
 
@@ -8456,7 +8465,7 @@ dependencies = [
  "flate2",
  "getrandom 0.4.3",
  "indexmap 2.14.2",
- "lzma-rust2",
+ "lzma-rust2 0.23.0",
  "memchr",
  "nix",
  "typed-path",

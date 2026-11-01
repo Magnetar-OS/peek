@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Built on the latest releases of its dependencies: lzma-rust2 0.25 and
+  pulldown-cmark 0.13.6 in peek-engine, and tokio 1.54.
+
 ## [2.3.1] - 2026-11-01
 
 ### Fixed

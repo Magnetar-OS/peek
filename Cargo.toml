@@ -17,7 +17,7 @@ license = "GPL-3.0-or-later"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
+tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
 tracing = "0.1"
 thiserror = "2"
 
