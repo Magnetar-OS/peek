@@ -8,7 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- `peek-engine` 2.1.0 (prepared, not yet published): archives are read with
+- Rebuilt against the current COSMIC libraries (libcosmic `95236a9`).
+- Open runs the file's application as its own unit of the user's systemd
+  session, through libcosmic's new launcher.
+- `peek-engine` 3.0.0 (prepared, not yet published): SVG is rendered with
+  resvg 0.49, and `picture::Error::Svg` carries resvg 0.49's `usvg::Error`,
+  which makes it a major version.
+- `peek-engine` 2.1.0, on crates.io since 2026-10-21: archives are read with
   zip 9, sevenz-rust2 0.24 and lzma-rust2 0.23, and the minimum supported Rust
   version is 1.99.1. No API change; a minor version because the minimum Rust
   version rose.

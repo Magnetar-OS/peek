@@ -85,6 +85,11 @@ url = "2"
 # GStreamer — see `previewer::path_from_uri`.
 gio = "0.22"
 
+# "Open" starts the handler as its own unit of the user's systemd session, so
+# it outlives the previewer rather than dying with it. libcosmic's launcher
+# crate, from the same repository and so the same locked revision.
+cosmic-launch = { git = "https://github.com/pop-os/libcosmic.git" }
+
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
 features = [
@@ -96,9 +101,6 @@ features = [
     # Needed to look up the handler application for "Open" and for the icons
     # shown on unpreviewable files.
     "desktop",
-    # The file being previewed opens in its own systemd scope, so it outlives
-    # the previewer rather than dying with it.
-    "desktop-systemd-scope",
     # File names come from the filesystem, so the title bar has to render
     # whatever is on disk — including scripts that need shaping.
     "advanced-shaping",

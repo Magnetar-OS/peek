@@ -39,6 +39,7 @@ use cosmic::Application as _;
 use cosmic::app::{Core, Task};
 use cosmic::iced::{Point, Size, Subscription, Vector, event, keyboard, window};
 use cosmic::widget::image;
+use cosmic_launch::CustomExecutable;
 use peek_engine::{Entry, Neighbourhood, Options, Player, Preview};
 
 use crate::anim::Panel;
@@ -907,8 +908,8 @@ impl App {
             return Task::none();
         };
 
-        // Spawned detached, in its own systemd scope, so the opened application
-        // outlives the previewer rather than dying with it.
+        // Spawned as its own systemd unit, so the opened application outlives
+        // the previewer rather than dying with it.
         Task::batch([open_uri(&uri), self.dismiss()])
     }
 
@@ -1182,36 +1183,49 @@ fn page_count(preview: &Preview) -> usize {
 /// mimeapps configuration the file manager does, so "Open" from the preview
 /// lands in the application the user has already chosen for that type.
 ///
-/// Spawned through libcosmic rather than through `std::process`, for two
-/// reasons that both matter to a process that stays resident. It double-forks
-/// and reaps the intermediate child, so a session's worth of "Open" presses
-/// does not leave a session's worth of zombies behind; and it registers the
-/// handler's PID as its own systemd scope, so the opened application belongs to
-/// the session rather than to the previewer and survives the previewer exiting.
+/// Spawned through libcosmic's launcher rather than through `std::process`,
+/// because it starts the handler as its own `app-…@….service` unit of the
+/// user's systemd session: the opened application belongs to the session
+/// rather than to the previewer, survives the previewer exiting, and leaves no
+/// zombie behind in a process that stays resident.
 fn open_uri(uri: &str) -> Task<Message> {
-    // Quoted: a path can contain spaces, and the exec string is split with
-    // shell rules on the other side.
-    let exec = format!("xdg-open {}", shell_quote(uri));
+    let exec = format!("xdg-open {}", exec_quote(uri));
     Task::future(async move {
-        cosmic::desktop::spawn_desktop_exec(
-            exec,
-            std::iter::empty::<(&str, &str)>(),
-            Some(APP_ID),
-            // Not a terminal program: `xdg-open` returns immediately and the
-            // handler it starts draws its own window.
-            false,
+        let session = match zbus::Connection::session().await {
+            Ok(session) => session,
+            Err(why) => {
+                tracing::error!(%why, "no session bus to open the file on");
+                return cosmic::action::app(Message::None);
+            }
+        };
+        // Not a terminal program: `xdg-open` returns immediately and the
+        // handler it starts draws its own window.
+        let executable = CustomExecutable::new("xdg-open".to_owned(), exec);
+        if let Err(why) = cosmic_launch::spawn(
+            &session,
+            &executable,
+            None,
+            &[],
+            None,
+            Vec::new(),
+            &[] as &[String],
         )
-        .await;
+        .await
+        {
+            tracing::error!(%why, "failed to open the file");
+        }
         cosmic::action::app(Message::None)
     })
 }
 
-/// Wrap a string in single quotes for a shell-style exec line.
+/// Quote a string as one argument of a desktop-entry `Exec` line.
 ///
-/// The exec string is parsed with `shlex`, so a bare path containing a space
-/// would arrive as two arguments and open nothing.
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', r"'\''"))
+/// The line is split with shell rules, so a path with a space in it would
+/// arrive as two arguments: hence the single quotes. Its field codes are then
+/// expanded, so every `%` is doubled — a file URI is full of `%20`, and `%2`
+/// is not a field code but would be dropped as one.
+fn exec_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''").replace('%', "%%"))
 }
 
 impl cosmic::Application for App {
@@ -2048,6 +2062,17 @@ fn keys(event: event::Event, _status: event::Status, _id: window::Id) -> Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A file URI keeps its `%20`s through the launcher's field-code
+    /// expansion, which reads `%%` as one `%` and drops any `%x` it does not
+    /// know — `%2` included.
+    #[test]
+    fn a_quoted_uri_survives_field_code_expansion() {
+        assert_eq!(
+            exec_quote("file:///home/a/It's%20here.pdf"),
+            r"'file:///home/a/It'\''s%%20here.pdf'"
+        );
+    }
 
     /// An app driven through `update` without a running libcosmic: default
     /// core, and settings that never touch the user's config store.
