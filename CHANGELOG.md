@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-11-01
+
 ### Changed
 
 - Built on the latest releases of its dependencies: lzma-rust2 0.25 and
@@ -303,7 +305,8 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
-[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.3.2...HEAD
+[2.3.2]: https://github.com/Magnetar-OS/peek/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/Magnetar-OS/peek/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/Magnetar-OS/peek/compare/v2.2.4...v2.3.0
 [2.2.4]: https://github.com/Magnetar-OS/peek/compare/v2.2.3...v2.2.4
