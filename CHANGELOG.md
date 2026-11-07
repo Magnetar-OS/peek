@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Rebuilt against the current COSMIC libraries (libcosmic `dd108aa`).
 - Built on zbus 6, as libcosmic now is. peek-engine 3.0.2 is on crates.io with
   sevenz-rust2 0.25.
 
