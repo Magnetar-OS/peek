@@ -42,8 +42,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::mpsc;
+use zbus::interface;
 use zbus::object_server::SignalEmitter;
-use zbus::{interface, zvariant};
 
 /// Well-known name Nautilus talks to.
 pub const NAME: &str = "org.gnome.NautilusPreviewer";
@@ -246,13 +246,9 @@ impl Service {
 /// command line and from "Open With", so a missing service is logged and the
 /// application carries on.
 pub async fn spawn() -> Option<(Service, mpsc::UnboundedReceiver<Request>)> {
-    match zbus::connection::Builder::session() {
-        Ok(builder) => spawn_on(builder).await,
-        Err(error) => {
-            tracing::warn!(%error, "could not reach the session bus");
-            None
-        }
-    }
+    // An unreachable session bus surfaces from `build`, where `spawn_on` logs
+    // it with the rest of the connection's failures.
+    spawn_on(zbus::connection::Builder::session()).await
 }
 
 /// Start the previewer service on the bus `builder` connects to.
@@ -273,16 +269,10 @@ pub(crate) async fn spawn_on(
     // The object server is set up before the name is requested. A client that
     // sees the name appear will call `ShowFile` immediately, and answering
     // `UnknownObject` at that point loses the very first preview.
-    let connection = match builder.serve_at(PATH, previewer) {
-        Ok(builder) => match builder.build().await {
-            Ok(connection) => connection,
-            Err(error) => {
-                tracing::warn!(%error, "could not serve the previewer interface");
-                return None;
-            }
-        },
+    let connection = match builder.serve_at(PATH, previewer).build().await {
+        Ok(connection) => connection,
         Err(error) => {
-            tracing::warn!(%error, "could not serve the previewer interface");
+            tracing::warn!(%error, "could not connect to the session bus and serve the previewer interface");
             return None;
         }
     };
@@ -293,9 +283,9 @@ pub(crate) async fn spawn_on(
     // refusal into an immediate answer rather than a subscription that might
     // fire hours later, mid-session.
     use zbus::fdo::RequestNameFlags;
-    let flags = RequestNameFlags::ReplaceExisting
-        | RequestNameFlags::AllowReplacement
-        | RequestNameFlags::DoNotQueue;
+    let flags = RequestNameFlags::REPLACE_EXISTING
+        | RequestNameFlags::ALLOW_REPLACEMENT
+        | RequestNameFlags::DO_NOT_QUEUE;
 
     match connection.request_name_with_flags(NAME, flags).await {
         Ok(_) => tracing::info!(name = NAME, "serving the file manager preview interface"),
@@ -384,10 +374,6 @@ pub fn uri_from_path(path: &std::path::Path) -> Option<String> {
         .map(|url| url.to_string())
 }
 
-/// The zvariant crate is required by the `interface` macro's expansion; naming
-/// it here keeps the dependency visible to a reader of the manifest.
-const _: Option<zvariant::Value<'static>> = None;
-
 /// A private message bus, for tests that claim bus names.
 ///
 /// Claiming `org.gnome.NautilusPreviewer` on the real session bus would take
@@ -423,7 +409,7 @@ impl TestBus {
 
     /// A connection builder for this bus.
     pub(crate) fn builder(&self) -> zbus::connection::Builder<'static> {
-        zbus::connection::Builder::address(self.address.as_str()).expect("a valid bus address")
+        zbus::connection::Builder::address(self.address.as_str())
     }
 
     /// Whether anything owns `name` on this bus, polled until it matches

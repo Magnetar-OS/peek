@@ -74,7 +74,7 @@ rust-embed = "8"
 
 # The previewer service is served on its own connection, separate from the one
 # libcosmic's single-instance support owns. See `src/previewer.rs`.
-zbus = { version = "5.19", default-features = false, features = ["tokio"] }
+zbus = { version = "6.2", default-features = false, features = ["tokio"] }
 
 # `Url` is what libcosmic hands back from a D-Bus `Open`, so paths have to make
 # the round trip through it.

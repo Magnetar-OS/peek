@@ -1,6 +1,6 @@
 [package]
 name = "peek-engine"
-version = "3.0.1"
+version = "3.0.2"
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -88,7 +88,7 @@ lzma-rust2 = { version = "0.25", default-features = false, features = ["std", "x
 zstd = "0.14"
 # Only the header reader: nothing here decompresses or writes a 7z, so the
 # encoder, AES, bzip2 and PPMd that the default features bring are unused.
-sevenz-rust2 = { version = "0.24", default-features = false }
+sevenz-rust2 = { version = "0.25", default-features = false }
 
 # Syntax highlighting for source files. `default-fancy` swaps oniguruma for
 # fancy-regex, keeping the build pure Rust.
@@ -132,4 +132,4 @@ flate2 = "1"
 # The xz encoder, for a fixture only.
 lzma-rust2 = { version = "0.25", default-features = false, features = ["std", "xz", "encoder"] }
 # The 7z writer, for a fixture only; the library build reads headers alone.
-sevenz-rust2 = { version = "0.24", default-features = false, features = ["compress"] }
+sevenz-rust2 = { version = "0.25", default-features = false, features = ["compress"] }
