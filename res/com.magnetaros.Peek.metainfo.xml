@@ -75,7 +75,7 @@
   <content_rating type="oars-1.1" />
 
   <releases>
-    <release version="2.3.3" date="2026-11-01"> <!-- x-release-kit-version-date -->
+    <release version="2.3.4" date="2026-11-07"> <!-- x-release-kit-version-date -->
       <description>
         <p>First release.</p>
       </description>
