@@ -1,6 +1,6 @@
-From ebbcf656b5efac16da309ddfce20daa4bcc04da3 Mon Sep 17 00:00:00 2001
+From 158b9afb7d1f50be7f8d4581309d893a027b0bbd Mon Sep 17 00:00:00 2001
 From: Dominikos Pritis <hey@myroomie.gr>
-Date: Mon, 7 Sep 2026 11:27:38 +0300
+Date: Mon, 9 Nov 2026 08:26:15 +0200
 Subject: [PATCH] feat: hand unpreviewable files to the desktop previewer on
  space
 MIME-Version: 1.0
@@ -23,46 +23,46 @@ the new path is reached only when the loop finds nothing it can show. If no
 previewer is installed the call fails and is logged at debug, which leaves the
 behaviour exactly as it is today.
 
-zbus is already in the dependency graph through libcosmic; naming it directly
+zbus 6 is already in the dependency graph through libcosmic; naming it directly
 costs no additional build.
 ---
  Cargo.lock |  1 +
  Cargo.toml |  4 +++
- src/tab.rs | 75 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 79 insertions(+), 1 deletion(-)
+ src/tab.rs | 73 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 77 insertions(+), 1 deletion(-)
 
 diff --git a/Cargo.lock b/Cargo.lock
-index 757d1bf..6de92da 100644
+index 0154e9f..a21261e 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -1452,6 +1452,7 @@ dependencies = [
+@@ -1425,6 +1425,7 @@ dependencies = [
   "xdg",
   "xdg-mime",
   "xdgen",
-+ "zbus 5.19.0",
++ "zbus 6.2.1",
   "zip",
  ]
  
 diff --git a/Cargo.toml b/Cargo.toml
-index 363ed44..022c908 100644
+index 222918a..ddb3080 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -36,6 +36,10 @@ tokio = { version = "1", features = ["process", "sync"] }
- trash = "5.2.6"
+@@ -35,6 +35,10 @@ tikv-jemallocator = { version = "0.7", optional = true }
+ tokio = { version = "1", features = ["process", "sync"] }
  url = "2.5"
  walkdir = "2.5.0"
 +# Already in the dependency graph through libcosmic; named directly so the
 +# previewer handoff in `tab.rs` can make one method call. See
 +# `show_in_previewer`.
-+zbus = { version = "5", default-features = false, features = ["tokio"] }
- wayland-client = { version = "0.31.14", optional = true }
++zbus = "6"
+ wayland-client = { version = "0.31.15", optional = true }
  xdg = { version = "3.0", optional = true }
  xdg-mime = { git = "https://github.com/ebassi/xdg-mime-rs" }
 diff --git a/src/tab.rs b/src/tab.rs
-index 79a5091..e00e4fc 100644
+index 540cdbd..6d9682e 100644
 --- a/src/tab.rs
 +++ b/src/tab.rs
-@@ -4015,15 +4015,43 @@ impl Tab {
+@@ -1685,15 +1685,41 @@ impl Tab {
              }
              Message::GalleryToggle => {
                  if let Some(indices) = self.column_sort() {
@@ -72,8 +72,8 @@ index 79a5091..e00e4fc 100644
 +                    let mut gallery_opened = false;
 +
                      for (_, item) in &indices {
--                        if item.selected && item.can_gallery() {
-+                        if !item.selected {
+-                        if item.state.selected && item.can_gallery() {
++                        if !item.state.selected {
 +                            continue;
 +                        }
 +                        if item.can_gallery() {
@@ -96,9 +96,7 @@ index 79a5091..e00e4fc 100644
 +                    // desktop's previewer service instead: that is the same
 +                    // interface Nautilus uses, so this works with GNOME's
 +                    // sushi and with any other previewer that claims the name.
-+                    if !gallery_opened
-+                        && let Some(path) = external_opt
-+                    {
++                    if !gallery_opened && let Some(path) = external_opt {
 +                        commands.push(Command::Iced(
 +                            cosmic::iced::Task::future(show_in_previewer(path))
 +                                .discard()
@@ -107,7 +105,7 @@ index 79a5091..e00e4fc 100644
                      }
                  }
              }
-@@ -8050,3 +8078,48 @@ mod tests {
+@@ -5706,3 +5732,48 @@ mod tests {
          Ok(())
      }
  }
@@ -128,7 +126,7 @@ index 79a5091..e00e4fc 100644
 +    const PATH: &str = "/org/gnome/NautilusPreviewer";
 +    const INTERFACE: &str = "org.gnome.NautilusPreviewer2";
 +
-+    let Some(uri) = url::Url::from_file_path(&path).ok().map(String::from) else {
++    let Ok(uri) = url::Url::from_file_path(&path) else {
 +        return;
 +    };
 +
@@ -157,5 +155,5 @@ index 79a5091..e00e4fc 100644
 +    }
 +}
 -- 
-2.55.0
+2.56.0
 

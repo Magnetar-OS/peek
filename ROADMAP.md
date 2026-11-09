@@ -15,7 +15,7 @@ whether what appears looks like it belongs on this desktop.
 
 | Capability | Quick Look | Sushi | Peek today |
 | --- | --- | --- | --- |
-| Space-bar preview from the file manager | yes | yes | Nautilus yes; cosmic-files needs the upstream patch |
+| Space-bar preview from the file manager | yes | yes | Nautilus yes; cosmic-files with Magnetar's patched build, upstream not yet |
 | Arrow-key navigation through the selection | yes | yes | yes |
 | Images with EXIF orientation and camera details | yes | yes | yes |
 | Animated images (GIF, APNG, animated WebP) | yes | yes | **yes** |
@@ -87,8 +87,11 @@ Peek's rendering is only half the product; the other half is being reachable
 from wherever the user's cursor is. This milestone is integration, not pixels.
 
 - **The cosmic-files patch goes upstream.** *Written and compiled* against
-  `089ad2b`, as `contrib/0001-cosmic-files-previewer-handoff.patch`; sending
-  it is all that remains, and that is not a code task. As framed in the README: when
+  master (`b2fbce2`), as `contrib/0001-cosmic-files-previewer-handoff.patch`,
+  and shipped in Magnetar as `magnetar-cosmic-files` meanwhile. Not sent:
+  pop-os's pull request template requires certifying that no LLM-generated
+  code, comments or description are included, and this patch was written with
+  one. Upstreaming it means a hand-written version. As framed in the README: when
   `GalleryToggle` fires on an item `can_gallery()` rejects, call `ShowFile` on
   `org.gnome.NautilusPreviewer2`. Images and text keep the built-in gallery;
   PDFs, video, audio, and archives stop doing nothing — and the patch serves
