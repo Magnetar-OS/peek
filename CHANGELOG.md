@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-09
+
 ### Added
 
 - Peek starts at login on COSMIC (`/etc/xdg/autostart`), so the file
@@ -331,7 +333,8 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
-[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.3.4...HEAD
+[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/Magnetar-OS/peek/compare/v2.3.4...v2.4.0
 [2.3.4]: https://github.com/Magnetar-OS/peek/compare/v2.3.3...v2.3.4
 [2.3.3]: https://github.com/Magnetar-OS/peek/compare/v2.3.2...v2.3.3
 [2.3.2]: https://github.com/Magnetar-OS/peek/compare/v2.3.1...v2.3.2
