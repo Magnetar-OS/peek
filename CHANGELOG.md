@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Video no longer flashes the panel background between frames. Frames from
+  720p up are uploaded to the GPU off the main thread, and a frame drawn before
+  its upload finished drew nothing; each frame now replaces the one on screen
+  only once it is resident.
+
 ## [2.4.0] - 2026-11-09
 
 ### Added

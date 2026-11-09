@@ -123,6 +123,57 @@ impl cosmic::app::CosmicFlags for Flags {
     }
 }
 
+/// Video frames between the decoder and the screen.
+///
+/// A frame is drawn only once the renderer has it resident. iced uploads a
+/// raster larger than 2 MiB — anything from 720p up — on a worker thread, and
+/// a handle drawn before that upload lands draws *nothing* for that frame. Each
+/// decoded frame is a new handle, so swapping them straight into the view made
+/// playback flash the panel background between frames. Instead each frame is
+/// allocated first, and the one on screen stays until its successor is ready.
+///
+/// One allocation is in flight at a time. A frame decoded meanwhile waits, and
+/// a newer one replaces it: the display only ever needs the latest picture.
+#[derive(Debug, Default)]
+struct VideoFrames {
+    /// Keeps the frame on screen resident; dropping it frees its texture.
+    shown: Option<cosmic::iced::runtime::image::Allocation>,
+    in_flight: bool,
+    waiting: Option<image::Handle>,
+}
+
+impl VideoFrames {
+    /// A frame was decoded: allocate it, or hold it until the one in flight
+    /// lands.
+    fn arrived(&mut self, handle: image::Handle, generation: u64) -> Task<Message> {
+        if self.in_flight {
+            self.waiting = Some(handle);
+            return Task::none();
+        }
+        self.allocate(handle, generation)
+    }
+
+    /// The frame in flight landed: send the one waiting, if any.
+    fn landed(&mut self, generation: u64) -> Task<Message> {
+        self.in_flight = false;
+        match self.waiting.take() {
+            Some(handle) => self.allocate(handle, generation),
+            None => Task::none(),
+        }
+    }
+
+    fn allocate(&mut self, handle: image::Handle, generation: u64) -> Task<Message> {
+        self.in_flight = true;
+        cosmic::iced::runtime::image::allocate(handle.clone()).map(move |result| {
+            cosmic::action::app(Message::FrameAllocated {
+                generation,
+                handle: handle.clone(),
+                result,
+            })
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     /// Preview these files, starting at `index`.
@@ -139,6 +190,14 @@ pub enum Message {
         /// Dropped unless still the latest listing asked for.
         listing: u64,
         around: Neighbourhood,
+    },
+    /// A decoded video frame is resident on the GPU and can replace the one
+    /// on screen. Dropped unless `generation` is still current.
+    FrameAllocated {
+        generation: u64,
+        handle: image::Handle,
+        result:
+            Result<cosmic::iced::runtime::image::Allocation, cosmic::iced::runtime::image::Error>,
     },
     /// A playback pipeline came up for the current file.
     PlayerReady {
@@ -323,6 +382,8 @@ pub struct App {
 
     /// Live playback, when the current file is media and a pipeline came up.
     player: Option<Player>,
+    /// Decoded video frames on their way to the GPU.
+    video: VideoFrames,
     /// Frames still to be pulled after an operation that changes what is on
     /// screen without playback running.
     ///
@@ -412,6 +473,7 @@ impl App {
             )),
             fullscreen: false,
             player: None,
+            video: VideoFrames::default(),
             pending_frames: 0,
             page: 0,
             zoom: 1.0,
@@ -480,6 +542,7 @@ impl App {
         // Before anything about the next file is known — including whether it
         // still exists — because none of that changes that the user left.
         self.player = None;
+        self.video = VideoFrames::default();
         self.pending_frames = 0;
 
         self.page = self.page.min(page_count(&self.preview).saturating_sub(1));
@@ -831,6 +894,7 @@ impl App {
         // Playback stops now rather than when the surface goes: the fade takes
         // 120 ms, and audio continuing through it sounds like a bug.
         self.player = None;
+        self.video = VideoFrames::default();
 
         if let Some(previewer) = &self.previewer {
             previewer.set_visible(false);
@@ -1853,12 +1917,14 @@ impl cosmic::Application for App {
                     self.image = Some(handle);
                 }
 
+                let mut upload = Task::none();
                 if let Some(player) = &self.player {
                     if let Some(raster) = player.frame() {
                         // By value: the frame is decoded for this handle and
                         // nothing else holds it, so moving the buffer in saves a
                         // full-frame copy on every frame that is drawn.
-                        self.image = Some(view::handle_from_raster(raster));
+                        let handle = view::handle_from_raster(raster);
+                        upload = self.video.arrived(handle, self.generation);
                     }
                     if player.is_finished() {
                         if self.config.loop_media {
@@ -1870,7 +1936,34 @@ impl cosmic::Application for App {
                     }
                 }
 
-                Task::none()
+                upload
+            }
+
+            Message::FrameAllocated {
+                generation,
+                handle,
+                result,
+            } => {
+                if generation != self.generation {
+                    return Task::none();
+                }
+                match result {
+                    Ok(allocation) => {
+                        self.image = Some(allocation.handle().clone());
+                        // Only now is the previous frame's allocation dropped:
+                        // it is what kept that frame drawable until this one
+                        // could replace it.
+                        self.video.shown = Some(allocation);
+                    }
+                    Err(error) => {
+                        // Drawn unallocated, the way frames were before: it
+                        // may show a gap, but a frame that never appears is
+                        // worse.
+                        tracing::debug!(%error, "could not allocate a video frame");
+                        self.image = Some(handle);
+                    }
+                }
+                self.video.landed(generation)
             }
         }
     }
@@ -2281,6 +2374,56 @@ mod tests {
             raster: Box::new(raster),
         });
         assert!(app.thumbnails.is_empty(), "a late cell is not cached");
+    }
+
+    fn frame_handle() -> image::Handle {
+        image::Handle::from_rgba(1, 1, vec![0; 4])
+    }
+
+    #[test]
+    fn a_frame_decoded_during_an_upload_waits_and_only_the_latest_is_kept() {
+        let mut video = VideoFrames::default();
+        let _ = video.arrived(frame_handle(), 0);
+        assert!(video.in_flight);
+
+        let _ = video.arrived(frame_handle(), 0);
+        let latest = frame_handle();
+        let _ = video.arrived(latest.clone(), 0);
+        assert_eq!(
+            video.waiting.as_ref().map(image::Handle::id),
+            Some(latest.id()),
+            "an older waiting frame is replaced, not queued"
+        );
+
+        let _ = video.landed(0);
+        assert!(video.in_flight, "the waiting frame is sent next");
+        assert!(video.waiting.is_none());
+
+        let _ = video.landed(0);
+        assert!(!video.in_flight);
+    }
+
+    #[test]
+    fn a_frame_allocated_for_an_earlier_file_is_not_shown() {
+        let mut app = app(Config::default());
+        let handle = frame_handle();
+        let _ = app.update(Message::FrameAllocated {
+            generation: app.generation.wrapping_sub(1),
+            handle: handle.clone(),
+            result: Err(cosmic::iced::runtime::image::Error::Empty),
+        });
+        assert!(app.image.is_none());
+
+        let _ = app.update(Message::FrameAllocated {
+            generation: app.generation,
+            handle: handle.clone(),
+            result: Err(cosmic::iced::runtime::image::Error::Empty),
+        });
+        assert_eq!(
+            app.image.as_ref().map(image::Handle::id),
+            Some(handle.id()),
+            "a frame that could not be allocated is still drawn"
+        );
     }
 
     #[test]
