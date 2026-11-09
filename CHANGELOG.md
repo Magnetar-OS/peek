@@ -14,6 +14,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A fitted image, page or video fills its panel with even margins. The panel
+  was sized for one margin under the content and laid out with two, so the
+  content shrank inside it and a PDF page sat in a band of empty panel.
+- Archives, folders, fonts, metadata cards and audio files open in a panel
+  sized to what they show, rather than a full-height column that was mostly
+  empty. Cards and audio take a narrower panel.
+- Audio without cover art shows a track card: the type icon, the title, the
+  artist and album, then the details. It was a bare list of fields.
 - Video no longer flashes the panel background between frames. Frames from
   720p up are uploaded to the GPU off the main thread, and a frame drawn before
   its upload finished drew nothing; each frame now replaces the one on screen

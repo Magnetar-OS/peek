@@ -127,6 +127,26 @@ pub const CODE_LINE_HEIGHT: f32 = 18.0;
 /// text preview.
 const NOTE_HEIGHT: f32 = 28.0;
 
+/// Width of a panel holding a single card — a track with no cover art, or the
+/// metadata card. A reading column's 920 px around six short rows is mostly
+/// empty panel.
+const CARD_WIDTH: f32 = 560.0;
+
+/// The audio card's icon edge, and the gap between its rows.
+pub const AUDIO_ICON: u16 = 96;
+pub const AUDIO_SPACING: f32 = 10.0;
+/// Gap between the rows of a label/value list.
+pub const DETAIL_SPACING: f32 = 6.0;
+
+/// Line heights of the interface's caption, body and title text, in logical
+/// pixels, measured from screenshots of the panel at 125%.
+///
+/// Used only to estimate how tall a list will be; the bodies scroll, so being
+/// a few pixels over leaves a little space and being under costs a scrollbar.
+const CAPTION_LINE: f32 = 17.0;
+const BODY_LINE: f32 = 21.0;
+const TITLE_LINE: f32 = 30.0;
+
 /// Characters that fit on one wrapped line of prose, approximately.
 ///
 /// Only used to guess how tall a prose document will be, so the panel opens
@@ -228,17 +248,11 @@ pub fn fit_size(screen: Size, preview: &Preview, config: &Config, layout: Layout
     }
 
     let fraction = if fullscreen { 1.0 } else { config.fraction() };
-    let available_width = (screen.width * fraction).max(MIN_WIDTH);
+    let margins = if fullscreen { 0.0 } else { PANEL_PADDING * 2.0 };
+    let available_width = (screen.width * fraction).max(MIN_WIDTH) - margins;
     let available_height = (screen.height * fraction).max(MIN_HEIGHT);
 
-    let chrome = if fullscreen {
-        // The header goes; the transport stays, because a video with no way
-        // to pause it is not a preview, it is a screensaver.
-        transport_height(preview)
-    } else {
-        HEADER_HEIGHT + transport_height(preview) + PANEL_PADDING * 2.0
-    };
-    let for_content = (available_height - chrome).max(MIN_HEIGHT);
+    let for_content = (available_height - chrome_height(preview, fullscreen)).max(MIN_HEIGHT);
 
     // Both dimensions are constrained, so a panorama is limited by width and a
     // portrait by height without either being special-cased.
@@ -309,11 +323,31 @@ pub fn content_size(
             image.height.min(screen.height - transport_height(preview)),
         ));
     }
-    let chrome = HEADER_HEIGHT + transport_height(preview) + PANEL_PADDING * 2.0;
     Some(Size::new(
-        image.width.min(screen.width - 24.0),
-        image.height.min(screen.height - chrome - 24.0),
+        image.width.min(screen.width - PANEL_PADDING * 2.0 - 24.0),
+        image
+            .height
+            .min(screen.height - chrome_height(preview, false) - 24.0),
     ))
+}
+
+/// Height of everything in the panel that is not the content: the header
+/// above it, the transport under a playable file, and the bottom margin.
+///
+/// The one definition both the panel's geometry and its layout use. When the
+/// two disagreed the content was given more room than it was sized for, and a
+/// fitted page or photo sat in a band of empty panel.
+///
+/// The header's own height is the space above the content; fullscreen drops
+/// the header and the margin, and keeps the transport, because a video with no
+/// way to pause it is not a preview, it is a screensaver.
+#[must_use]
+pub fn chrome_height(preview: &Preview, fullscreen: bool) -> f32 {
+    if fullscreen {
+        transport_height(preview)
+    } else {
+        HEADER_HEIGHT + transport_height(preview) + PANEL_PADDING
+    }
 }
 
 /// How far the content can be panned from centre, per axis.
@@ -350,9 +384,10 @@ pub fn panel_rect(screen: Size, preview: &Preview, config: &Config, layout: Layo
 
     let (width, height) = match content_size(screen, preview, config, layout) {
         Some(content) if fullscreen => (content.width, content.height + transport_height(preview)),
+        // The content is inset by the margin on both sides.
         Some(content) => (
-            content.width,
-            content.height + HEADER_HEIGHT + transport_height(preview) + PANEL_PADDING * 2.0,
+            content.width + PANEL_PADDING * 2.0,
+            content.height + chrome_height(preview, false),
         ),
         // A preview with no aspect ratio — text, a card — fills the output in
         // fullscreen rather than keeping its reading column, because the mode
@@ -392,11 +427,18 @@ pub fn panel_rect(screen: Size, preview: &Preview, config: &Config, layout: Layo
                     };
 
                     let content = rows * CODE_LINE_HEIGHT + notes;
-                    (content + HEADER_HEIGHT + PANEL_PADDING * 2.0).clamp(MIN_HEIGHT, tallest)
+                    (content + chrome_height(preview, false)).clamp(MIN_HEIGHT, tallest)
                 }
-                _ => tallest,
+                // Sized to what the body holds, for the same reason.
+                _ => body_height(preview).map_or(tallest, |content| {
+                    (content + chrome_height(preview, false)).clamp(MIN_HEIGHT, tallest)
+                }),
             };
-            (READING_WIDTH.min(screen.width - 48.0), height)
+            let width = match preview {
+                Preview::Media(_) | Preview::Card(_) | Preview::Failed { .. } => CARD_WIDTH,
+                _ => READING_WIDTH,
+            };
+            (width.min(screen.width - 48.0), height)
         }
     };
 
@@ -408,6 +450,78 @@ pub fn panel_rect(screen: Size, preview: &Preview, config: &Config, layout: Layo
         .min(screen.height);
 
     centred(screen, width, height)
+}
+
+/// How tall a list-like body will lay out, estimated from its rows.
+///
+/// Mirrors the bodies in `view` — their spacing and the text styles of each
+/// row. `None` for a body that should take the full reading height whatever
+/// it holds, which is a book: its text runs on.
+fn body_height(preview: &Preview) -> Option<f32> {
+    /// Rows of one height with a gap between each.
+    fn rows(count: usize, line: f32, gap: f32) -> f32 {
+        count as f32 * (line + gap)
+    }
+
+    let height = match preview {
+        Preview::Archive(archive) if archive.members.is_empty() => CAPTION_LINE,
+        Preview::Archive(archive) => rows(archive.members.len() + 1, CAPTION_LINE, 2.0),
+        Preview::Directory(directory) if directory.unreadable => CAPTION_LINE,
+        Preview::Directory(directory) => rows(
+            2 + directory.sample.len() + usize::from(directory.truncated),
+            CAPTION_LINE,
+            4.0,
+        ),
+        Preview::Font(font) => {
+            // The family name, the pangram at each size, the alphabet, then
+            // the facts, 10 px apart. A specimen line measures about its point
+            // size: the sample is one unwrapped line with no leading.
+            let specimen: f32 = [28.0, 32.0, 24.0, 18.0, 14.0, 11.0, 18.0]
+                .iter()
+                .map(|size| size + 10.0)
+                .sum();
+            let facts = 1
+                + usize::from(font.version.is_some())
+                + usize::from(font.faces > 1)
+                + usize::from(font.variable || font.monospaced);
+            specimen + rows(facts, CAPTION_LINE, 10.0)
+        }
+        Preview::Card(card) => card_height(card, 0),
+        Preview::Failed { card, .. } => card_height(card, 1),
+        Preview::Media(media) if !media.decodable => CAPTION_LINE,
+        Preview::Media(media) => {
+            let byline = media
+                .tags
+                .iter()
+                .any(|(label, _)| label == "Artist" || label == "Album");
+            let details = media
+                .tags
+                .iter()
+                .filter(|(label, _)| !matches!(label.as_str(), "Title" | "Artist" | "Album"))
+                .count()
+                + media.streams.len();
+            f32::from(AUDIO_ICON)
+                + AUDIO_SPACING
+                + TITLE_LINE
+                + if byline {
+                    AUDIO_SPACING + BODY_LINE
+                } else {
+                    0.0
+                }
+                + AUDIO_SPACING * 2.0
+                + rows(details, CAPTION_LINE, DETAIL_SPACING)
+        }
+        _ => return None,
+    };
+    // A little room under the last row, so an estimate that comes out short
+    // still does not end the list flush on the margin.
+    Some(height + 8.0)
+}
+
+/// A metadata card: its notes, the type icon, then a row per field.
+fn card_height(card: &peek_engine::Card, notes: usize) -> f32 {
+    let icon = 64.0 + 16.0;
+    (notes + card.rows.len()) as f32 * (CAPTION_LINE + 8.0) + icon + 8.0
 }
 
 /// Place a panel of this size in the middle of the output.
@@ -545,11 +659,54 @@ mod tests {
     fn a_reading_column_ignores_the_content_and_uses_a_fixed_width() {
         let rect = panel_rect(
             screen(),
-            &Preview::Card(Box::default()),
+            &Preview::Archive(Box::default()),
             &Config::default(),
             Layout::default(),
         );
         assert_eq!(rect.width, READING_WIDTH);
+    }
+
+    #[test]
+    fn a_card_takes_a_narrow_panel_sized_to_its_rows() {
+        let rect = panel_rect(
+            screen(),
+            &Preview::Card(Box::default()),
+            &Config::default(),
+            Layout::default(),
+        );
+        assert_eq!(rect.width, CARD_WIDTH);
+        assert!(rect.height < screen().height * READING_FRACTION);
+    }
+
+    #[test]
+    fn a_short_list_is_not_given_a_full_reading_column() {
+        let short = Preview::Archive(Box::new(peek_engine::Archive {
+            members: vec![
+                peek_engine::archive::Member {
+                    name: "a".into(),
+                    size: 1,
+                    compressed: None,
+                    is_dir: false,
+                    encrypted: false,
+                };
+                3
+            ],
+            ..Default::default()
+        }));
+        let rect = panel_rect(screen(), &short, &Config::default(), Layout::default());
+        assert!(rect.height < screen().height * READING_FRACTION);
+    }
+
+    #[test]
+    fn a_fitted_image_gets_exactly_its_own_size_inside_the_panel() {
+        // When the panel's chrome and the layout's chrome disagreed, a page was
+        // given more room than it was sized for and floated in empty panel.
+        let preview = photo(800, 1000);
+        let layout = Layout::default();
+        let rect = panel_rect(screen(), &preview, &Config::default(), layout);
+        let content = content_size(screen(), &preview, &Config::default(), layout).expect("visual");
+        assert_eq!(rect.height - chrome_height(&preview, false), content.height);
+        assert_eq!(rect.width - PANEL_PADDING * 2.0, content.width);
     }
 
     /// A raster, which carries a real resolution and must not be enlarged past it.

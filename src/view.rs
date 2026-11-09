@@ -36,7 +36,10 @@ use crate::anim::Panel;
 use crate::app::{Message, Setting};
 use crate::config::Config;
 use crate::fl;
-use crate::surface::{self, HEADER_HEIGHT, PANEL_PADDING, PANEL_RADIUS, TRANSPORT_HEIGHT};
+use crate::surface::{
+    self, AUDIO_ICON, AUDIO_SPACING, DETAIL_SPACING, HEADER_HEIGHT, PANEL_PADDING, PANEL_RADIUS,
+    TRANSPORT_HEIGHT,
+};
 
 /// Edge length of the file-type icon in the header.
 const HEADER_ICON: u16 = 30;
@@ -299,11 +302,7 @@ fn panel<'a>(frame: &Frame<'a>, alpha: f32, rect: cosmic::iced::Rectangle) -> El
     let cosmic = theme.cosmic();
 
     let transport_height = surface::transport_height(frame.preview);
-    let chrome = if frame.fullscreen {
-        transport_height
-    } else {
-        HEADER_HEIGHT + transport_height + PANEL_PADDING
-    };
+    let chrome = surface::chrome_height(frame.preview, frame.fullscreen);
     let content_height = (rect.height - chrome).max(1.0);
 
     // Fullscreen drops the header and the panel's own surface: the point of
@@ -771,7 +770,10 @@ fn visual<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
         .into()
 }
 
-/// Audio with no cover art: the tags and the stream description.
+/// Audio with no cover art: the type's icon, the track, and the details.
+///
+/// Laid out like a track card rather than a form: the title and the artist are
+/// what identify a song, so they lead, and the rest is a list under them.
 fn media_details<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
     let Preview::Media(media) = frame.preview else {
         return centred(hint(fl!("nothing-to-show"), alpha));
@@ -781,18 +783,63 @@ fn media_details<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
         return centred(hint(fl!("no-codec"), alpha));
     }
 
-    let mut rows = column::with_capacity(media.tags.len() + media.streams.len())
-        .spacing(6)
-        .width(Length::Fill);
+    let theme = cosmic::theme::active();
+    let cosmic = theme.cosmic();
+    let body = fade(Color::from(cosmic.on_bg_color()), alpha);
 
+    let tag = |name: &str| {
+        media
+            .tags
+            .iter()
+            .find(|(label, _)| label == name)
+            .map(|(_, value)| value.as_str())
+    };
+    let title = tag("Title")
+        .map(str::to_owned)
+        .or_else(|| frame.entry.map(|entry| entry.name.clone()))
+        .unwrap_or_default();
+    let byline = [tag("Artist"), tag("Album")]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" — ");
+
+    let icon_name = frame.entry.map_or_else(
+        || "audio-x-generic".to_owned(),
+        |entry| meta::icon_name(&entry.mime),
+    );
+    let mut stack = column::with_capacity(media.tags.len() + media.streams.len() + 3)
+        .spacing(AUDIO_SPACING)
+        .width(Length::Fill)
+        .align_x(Alignment::Center)
+        .push(
+            icon::from_name(icon_name)
+                .fallback(Some(icon::IconFallback::Names(vec![
+                    "audio-x-generic".into(),
+                ])))
+                .size(AUDIO_ICON)
+                .icon(),
+        )
+        .push(text::title3(title).class(colour(body)));
+    if !byline.is_empty() {
+        stack = stack.push(hint(byline, alpha));
+    }
+
+    let mut details = column::with_capacity(media.tags.len() + media.streams.len())
+        .spacing(DETAIL_SPACING)
+        .width(Length::Fill);
     for (label, value) in &media.tags {
-        rows = rows.push(labelled(label, value, alpha));
+        if !matches!(label.as_str(), "Title" | "Artist" | "Album") {
+            details = details.push(labelled(label, value, alpha));
+        }
     }
     for stream in &media.streams {
-        rows = rows.push(labelled(&fl!("stream"), stream, alpha));
+        details = details.push(labelled(&fl!("stream"), stream, alpha));
     }
 
-    scrollable(rows).height(Length::Fill).into()
+    scrollable(stack.push(details.padding([AUDIO_SPACING as u16, 0, 0, 0])))
+        .height(Length::Fill)
+        .into()
 }
 
 /// Logical lines rendered beyond each edge of the visible range.
