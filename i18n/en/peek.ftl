@@ -119,6 +119,7 @@ mime-folder = Folder
 mime-pdf = PDF document
 mime-zip = Zip archive
 mime-plain-text = Plain text
+mime-markdown = Markdown
 mime-binary = Binary file
 mime-image = { $subtype } image
 mime-video = { $subtype } video

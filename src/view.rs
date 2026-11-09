@@ -453,7 +453,13 @@ fn summary(frame: &Frame<'_>) -> Option<String> {
     }
 
     if let Some(entry) = frame.entry {
-        parts.push(mime_name(&entry.mime));
+        // Markdown has no magic of its own and usually sniffs as plain text;
+        // it is recognised by its extension, and rendered, so say so.
+        parts.push(if entry.kind == peek_engine::Kind::Markdown {
+            fl!("mime-markdown")
+        } else {
+            mime_name(&entry.mime)
+        });
         if entry.size > 0 {
             parts.push(meta::size(entry.size));
         }
@@ -492,7 +498,10 @@ fn summary(frame: &Frame<'_>) -> Option<String> {
             ));
         }
         Preview::Text(document) => {
-            if let Some(language) = &document.language {
+            // Not twice: a Markdown file's type above is already "Markdown".
+            if let Some(language) = &document.language
+                && parts.first() != Some(language)
+            {
                 parts.push(language.clone());
             }
             parts.push(fl!("line-count", count = document.lines.len()));
@@ -901,7 +910,15 @@ fn text_body<'a>(
         if index > 0 {
             spans.push(span("\n"));
         }
-        for run in &line.spans {
+        // A rendered heading arrives as its hashes, then its text. Prose is
+        // shaped whole rather than windowed, so it can afford what a fixed line
+        // height cannot: the heading is set at its level's size and the hashes
+        // that stood in for that size are dropped.
+        let (runs, size) = match heading_level(document, line) {
+            Some(level) => (&line.spans[1..], Some(heading_size(level))),
+            None => (&line.spans[..], None),
+        };
+        for run in runs {
             // An all-zero colour is the highlighter's way of saying "no opinion"
             // — see `peek_engine::text::plain` — and has to follow the desktop
             // theme rather than render as literal black.
@@ -915,11 +932,13 @@ fn text_body<'a>(
             };
             // Weight and slant are what carry a heading or an emphasis once
             // the Markdown punctuation that meant them has been rendered away.
-            spans.push(
-                span(run.text.as_str())
-                    .color(colour)
-                    .font(styled_face(face, run.bold, run.italic)),
-            );
+            let mut piece = span(run.text.as_str())
+                .color(colour)
+                .font(styled_face(face, run.bold, run.italic));
+            if let Some(size) = size {
+                piece = piece.size(size);
+            }
+            spans.push(piece);
         }
     }
 
@@ -990,6 +1009,34 @@ fn text_body<'a>(
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
+}
+
+/// The level of a rendered Markdown heading, from the hashes it starts with.
+///
+/// Only in prose, and only a bold run of nothing but hashes and a space followed
+/// by more text: that is the shape `peek_engine::markdown` gives a heading, and
+/// not one a comment in a code block can take.
+fn heading_level(
+    document: &peek_engine::Document,
+    line: &peek_engine::text::Line,
+) -> Option<usize> {
+    if !document.prose || line.spans.len() < 2 {
+        return None;
+    }
+    let first = &line.spans[0];
+    let hashes = first.text.strip_suffix(' ')?;
+    (first.bold && !hashes.is_empty() && hashes.len() <= 6 && hashes.chars().all(|c| c == '#'))
+        .then_some(hashes.len())
+}
+
+/// Text size for a heading level, stepping down to the body size by level four.
+fn heading_size(level: usize) -> f32 {
+    match level {
+        1 => 26.0,
+        2 => 21.0,
+        3 => 18.0,
+        _ => f32::from(PROSE_SIZE) + 1.0,
+    }
 }
 
 /// A face carrying a span's weight and slant.
@@ -1612,6 +1659,48 @@ fn colour(color: Color) -> cosmic::theme::Text {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn line(texts: &[(&str, bool)]) -> peek_engine::text::Line {
+        peek_engine::text::Line {
+            spans: texts
+                .iter()
+                .map(|(text, bold)| peek_engine::text::Span {
+                    text: (*text).to_owned(),
+                    color: [0, 0, 0],
+                    bold: *bold,
+                    italic: false,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn a_rendered_heading_is_recognised_by_its_hashes_in_prose_only() {
+        let prose = peek_engine::Document {
+            prose: true,
+            ..Default::default()
+        };
+        let source = peek_engine::Document::default();
+
+        assert_eq!(
+            heading_level(&prose, &line(&[("## ", true), ("Status", true)])),
+            Some(2)
+        );
+        assert_eq!(
+            heading_level(&source, &line(&[("## ", true), ("Status", true)])),
+            None
+        );
+        // A comment in a code block is one plain run, not hashes then text.
+        assert_eq!(
+            heading_level(&prose, &line(&[("# a comment", false)])),
+            None
+        );
+        assert_eq!(
+            heading_level(&prose, &line(&[("# ", false), ("text", false)])),
+            None
+        );
+        assert!(heading_size(1) > heading_size(2) && heading_size(2) > heading_size(3));
+    }
 
     /// Strip Fluent's bidi isolation marks.
     ///

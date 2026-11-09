@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Markdown headings are set at sizes that step down by level, instead of
+  body-size text behind their `#` marks, and the header calls a `.md` file
+  Markdown rather than plain text.
 - The scroll wheel turns pages on PDFs and comics instead of zooming them.
   Zoomed in, it scrolls down the page first and turns it at the edge.
   Ctrl+wheel zooms any image, page or video; plain wheel still zooms images.
