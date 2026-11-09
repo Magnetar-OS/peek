@@ -96,9 +96,8 @@ process. Two consequences:
   `//TODO: load from config` — so this cannot be redirected from the outside,
   and nothing else exposes the selection to another process.
 
-So on COSMIC, `peek` is reached three ways today — the command line, its D-Bus
-activation, and **Open With → Peek**. The fourth needs a change to cosmic-files,
-and that change is written:
+So stock cosmic-files reaches `peek` only through the command line and **Open
+With → Peek**. Space needs a change to cosmic-files, and that change is written:
 [`contrib/0001-cosmic-files-previewer-handoff.patch`](contrib/0001-cosmic-files-previewer-handoff.patch).
 In the `GalleryToggle` handler, when nothing in the selection is something
 `can_gallery()` accepts, it calls `ShowFile` on the previewer interface. Images
@@ -106,10 +105,19 @@ and text keep the built-in gallery; everything else stops doing nothing.
 
 Framed that way it is not "make cosmic-files use `peek`" — it is "make space work
 for the file types the built-in gallery does not handle, through the standard
-desktop interface", which also works for anyone running GNOME's sushi. That is
-the version worth sending upstream, and it is the version in the patch: it
-names no previewer, only the interface. It applies to `089ad2b` (Epoch 1.8.0)
-and compiles there.
+desktop interface", which also works for anyone running GNOME's sushi. It names
+no previewer, only the interface. The patch here is against cosmic-files master
+(`b2fbce2`) and compiles there.
+
+**Magnetar ships it.** `magnetar-cosmic-files` in `[magnetar]` is COSMIC's file
+manager built from its release tag with this patch applied, and
+`magnetar-desktop` installs it in place of `cosmic-files`.
+
+For the call to land on `peek`, `peek` has to hold the bus name when space is
+pressed. On COSMIC the package starts the daemon at login from
+`/etc/xdg/autostart`, so it does; it maps nothing until a file arrives. If
+sushi is installed, its D-Bus activation file still answers whenever `peek` is
+not running.
 
 ## Install
 
@@ -316,8 +324,8 @@ the same poppler, so this costs nothing.
 
 ## Known rough edges
 
-- The space bar does not reach `peek` from cosmic-files. See above — this needs a
-  change upstream, not here.
+- The space bar reaches `peek` from cosmic-files only with the patched build
+  (`magnetar-cosmic-files`) until the change is in an upstream release. See above.
 - The desktop entry's `Name`, `Comment` and `Keywords` are not translated.
   cosmic-app-template generates the localised variants with an `xdgen` build
   script, but adding that build dependency here re-resolves the dependency graph

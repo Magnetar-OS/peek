@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Peek starts at login on COSMIC (`/etc/xdg/autostart`), so the file
+  manager's space bar finds the previewer already running. It shows nothing
+  until a file is sent to it.
+
+### Changed
+
+- The cosmic-files patch in `contrib/` is rebased onto cosmic-files master.
+
 ## [2.3.4] - 2026-11-07
 
 ### Changed

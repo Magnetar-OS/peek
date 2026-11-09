@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Peek (daemon)
+Comment=Keeps the previewer on the session bus so the file manager's space bar reaches it
+# No file: the daemon starts resident and maps nothing until a file manager
+# calls org.gnome.NautilusPreviewer2.ShowFile.
+Exec=magnetar-peek
+Icon=com.magnetaros.Peek
+Terminal=false
+NoDisplay=true
+# COSMIC only. On GNOME, sushi already answers the same interface through
+# D-Bus activation, and a resident Peek would take its name at every login.
+OnlyShowIn=COSMIC;
+X-GNOME-Autostart-enabled=true

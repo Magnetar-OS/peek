@@ -24,6 +24,9 @@ icon-symbolic := appid + '-symbolic.svg'
 icon-sizes := '16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512'
 # The thumbnailer's registration with the thumbnail factories.
 thumbnailer-entry := appid + '.thumbnailer'
+# Starts the daemon at login on COSMIC, so the file manager's space bar finds
+# the previewer service already on the bus.
+autostart := appid + '.Autostart.desktop'
 
 # Install destinations
 base-dir := absolute_path(clean(rootdir / prefix))
@@ -37,6 +40,9 @@ thumbnailer-bin-dst := base-dir / 'bin' / 'peek-thumbnailer'
 thumbnailer-entry-dst := base-dir / 'share' / 'thumbnailers' / thumbnailer-entry
 plugins-dst := base-dir / 'share' / 'peek' / 'plugins'
 man-dst := base-dir / 'share' / 'man' / 'man1' 
+# Outside the prefix: XDG autostart is read from /etc/xdg/autostart.
+# install-user points this at ~/.config/autostart instead.
+autostart-dst := absolute_path(clean(rootdir / 'etc')) / 'xdg' / 'autostart' / desktop
 
 bin-src := cargo-target-dir / 'release' / name
 thumbnailer-bin-src := cargo-target-dir / 'release' / 'peek-thumbnailer'
@@ -99,6 +105,7 @@ install:
     install -Dm0644 res/{{desktop}} {{desktop-dst}}
     install -Dm0644 res/{{appdata}} {{appdata-dst}}
     install -Dm0644 res/{{thumbnailer-entry}} {{thumbnailer-entry-dst}}
+    install -Dm0644 res/{{autostart}} {{autostart-dst}}
     install -Dm0644 {{icon-dir}}/scalable/apps/{{icon-svg}} {{icon-svg-dst}}
     install -Dm0644 {{icon-dir}}/symbolic/apps/{{icon-symbolic}} {{icon-symbolic-dst}}
     for size in {{icon-sizes}}; do \
@@ -125,7 +132,7 @@ install:
 
 # Uninstalls installed files
 uninstall:
-    rm -f {{bin-dst}} {{thumbnailer-bin-dst}} {{desktop-dst}} {{appdata-dst}} {{thumbnailer-entry-dst}} {{icon-svg-dst}} {{icon-symbolic-dst}}
+    rm -f {{bin-dst}} {{thumbnailer-bin-dst}} {{desktop-dst}} {{appdata-dst}} {{thumbnailer-entry-dst}} {{autostart-dst}} {{icon-svg-dst}} {{icon-symbolic-dst}}
     for size in {{icon-sizes}}; do \
         rm -f {{icons-dst}}/$size/apps/{{appid}}.png; \
     done
@@ -135,7 +142,7 @@ uninstall:
 
 # Install to the current user rather than the system, for dogfooding.
 install-user:
-    just rootdir='' prefix={{env('HOME')}}/.local install
+    just rootdir='' prefix={{env('HOME')}}/.local autostart-dst={{env('HOME')}}/.config/autostart/{{desktop}} install
 
 # Vendor dependencies locally
 vendor:
@@ -175,4 +182,5 @@ flatpak-sources:
 # Validate the desktop entry and the AppStream metadata
 validate:
     -desktop-file-validate res/{{desktop}}
+    -desktop-file-validate res/{{autostart}}
     -appstreamcli validate --no-net res/{{appdata}}

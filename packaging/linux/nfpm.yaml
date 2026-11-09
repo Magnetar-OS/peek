@@ -98,8 +98,11 @@ contents:
   # repository never updates. The .deb and .rpm tolerate it, which is why this
   # only ever shows up on Arch.
   #
-  # This justfile installs under the prefix only. A new top-level directory in
-  # the install tree needs a new entry here.
+  # A new top-level directory in the install tree needs a new entry here.
   - src: .release-kit/pkgroot/usr
     dst: /usr
+    type: tree
+  # The XDG autostart entry, /etc/xdg/autostart.
+  - src: .release-kit/pkgroot/etc
+    dst: /etc
     type: tree
