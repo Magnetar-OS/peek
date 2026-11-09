@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-09
+
 ### Changed
 
 - Markdown headings are set at sizes that step down by level, instead of
@@ -357,7 +359,8 @@ All notable changes to this project are documented here. The format follows
   decode-failure reasons moved behind the Fluent catalogue. The technical
   error text still reaches the journal and `probe`.
 
-[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/Magnetar-OS/peek/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/Magnetar-OS/peek/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/Magnetar-OS/peek/compare/v2.3.4...v2.4.0
 [2.3.4]: https://github.com/Magnetar-OS/peek/compare/v2.3.3...v2.3.4
 [2.3.3]: https://github.com/Magnetar-OS/peek/compare/v2.3.2...v2.3.3
