@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The scroll wheel turns pages on PDFs and comics instead of zooming them.
+  Zoomed in, it scrolls down the page first and turns it at the edge.
+  Ctrl+wheel zooms any image, page or video; plain wheel still zooms images.
+
 ### Fixed
 
 - Video no longer flashes the panel background between frames. Frames from

@@ -22,7 +22,6 @@
 
 use std::time::Instant;
 
-use cosmic::iced::mouse::ScrollDelta;
 use cosmic::iced::widget::text::{LineHeight, Wrapping};
 use cosmic::iced::widget::{pin, rich_text, space, span};
 use cosmic::iced::{Alignment, Background, Color, ContentFit, Length, Size, Vector};
@@ -759,16 +758,9 @@ fn visual<'a>(frame: &Frame<'a>, alpha: f32) -> Element<'a, Message> {
     };
 
     mouse_area(sized)
-        .on_scroll(|delta| {
-            // Exponential, so equal wheel travel means equal magnification
-            // whichever direction it happens in, and the two delta units meet
-            // at roughly the same speed.
-            let factor = match delta {
-                ScrollDelta::Lines { y, .. } => (y * 0.15).exp(),
-                ScrollDelta::Pixels { y, .. } => (y * 0.002).exp(),
-            };
-            Message::Zoom(factor)
-        })
+        // What the wheel does depends on the preview and the modifiers, which
+        // the app holds; see `App::wheel`.
+        .on_scroll(Message::Wheel)
         .on_press(Message::DragStart)
         .on_release(Message::DragEnd)
         // A drag that leaves the content must not stay stuck to the pointer

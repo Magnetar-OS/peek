@@ -49,7 +49,8 @@ Working and dogfoodable on COSMIC 1.5.
 - Fonts as a specimen, set in the font itself
 - Archives listed without extracting: zip, 7z, tar and its four compressions
 - Directories summarised; anything else gets a metadata card
-- Zoom with the scroll wheel, pan a cropped image by dragging, double-click to
+- Zoom with the scroll wheel on images (Ctrl+wheel on anything visual), turn
+  pages with it on documents, pan a cropped image by dragging, double-click to
   jump between fit and 100%; fullscreen when the file should have the display
 - Rendered Markdown — headings, emphasis, lists, and highlighted code blocks,
   with no browser engine anywhere near the process
@@ -193,8 +194,9 @@ the index sheet or fullscreen, whichever is showing, and close the preview
 otherwise. `magnetar-peek --help` prints this table from the one the key
 handler reads.
 
-The pointer works too: scrolling over an image, page, or video zooms it,
-dragging pans it once zoom has cropped it, double-clicking jumps between the
+The pointer works too: scrolling over an image zooms it, scrolling over a PDF
+or comic moves down the page and then turns it, Ctrl+scrolling zooms any of
+them or a video, dragging pans once zoom has cropped, double-clicking jumps between the
 fitted view and the file's own pixels, and clicking outside the panel
 dismisses — clicking the content itself never does.
 

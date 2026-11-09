@@ -37,6 +37,7 @@ use std::time::{Duration, Instant};
 
 use cosmic::Application as _;
 use cosmic::app::{Core, Task};
+use cosmic::iced::mouse::ScrollDelta;
 use cosmic::iced::{Point, Size, Subscription, Vector, event, keyboard, window};
 use cosmic::widget::image;
 use cosmic_launch::CustomExecutable;
@@ -78,6 +79,9 @@ const MAX_THUMBNAILS: usize = 250;
 /// pipeline needs a handful of draw cycles to decode and deliver, and on a
 /// 60 Hz display this is a fifth of a second.
 const FRAMES_AFTER_SEEK: u8 = 12;
+
+/// Pixels of touchpad travel counted as one wheel notch.
+const WHEEL_NOTCH_PIXELS: f32 = 50.0;
 
 /// Startup flags.
 ///
@@ -217,6 +221,10 @@ pub enum Message {
     Page(isize),
     /// Scale a visual preview by a multiplier.
     Zoom(f32),
+    /// The wheel turned over the content.
+    Wheel(ScrollDelta),
+    /// The held keyboard modifiers changed.
+    Modifiers(keyboard::Modifiers),
     /// Return to the natural fit.
     ResetZoom,
     /// Jump between the fitted view and the file's own pixels — double-click.
@@ -393,6 +401,13 @@ pub struct App {
     /// looks broken. A short countdown covers the pipeline's own latency in
     /// producing it.
     pending_frames: u8,
+    /// Keyboard modifiers held now, which decide what the wheel does.
+    modifiers: keyboard::Modifiers,
+    /// Wheel travel toward the next page turn, in notches.
+    ///
+    /// A mouse wheel reports whole notches, a touchpad a stream of small pixel
+    /// deltas; turning a page per event would flip twenty pages on one swipe.
+    wheel_travel: f32,
     /// Page of a multi-page document, carried across loads so that stepping
     /// away and back does not silently reset it.
     page: usize,
@@ -475,6 +490,8 @@ impl App {
             player: None,
             video: VideoFrames::default(),
             pending_frames: 0,
+            modifiers: keyboard::Modifiers::empty(),
+            wheel_travel: 0.0,
             page: 0,
             zoom: 1.0,
             config,
@@ -797,6 +814,69 @@ impl App {
     }
 
     /// Keep the pan inside the cropped area, or at centre when nothing crops.
+    /// The wheel turned over the content.
+    ///
+    /// Ctrl+wheel zooms anything visual. Without Ctrl it depends on what the
+    /// file is: a picture zooms, the way image viewers do; a paged document
+    /// scrolls the page while zoom has cropped it and turns pages otherwise,
+    /// the way document viewers do; anything else ignores it.
+    fn wheel(&mut self, delta: ScrollDelta) -> Task<Message> {
+        // Notches, positive away from the user (scrolling up). A touchpad's
+        // pixels are scaled to about one notch per 50 px of travel.
+        let (notches, pixels) = match delta {
+            ScrollDelta::Lines { y, .. } => (y, y * WHEEL_NOTCH_PIXELS),
+            ScrollDelta::Pixels { y, .. } => (y / WHEEL_NOTCH_PIXELS, y),
+        };
+
+        let paged = matches!(self.preview, Preview::Pdf(_) | Preview::Comic(_));
+        if self.modifiers.control() || (!paged && matches!(self.preview, Preview::Picture(_))) {
+            if !self.preview.is_visual() {
+                return Task::none();
+            }
+            // Exponential, so equal wheel travel means equal magnification
+            // whichever direction it happens in.
+            return self.update(Message::Zoom((notches * 0.15).exp()));
+        }
+        if !paged {
+            return Task::none();
+        }
+
+        // Zoomed in: the wheel moves down the page first, and turns it only
+        // once the page's edge is reached.
+        let (_, max_y) = surface::max_pan(self.screen, &self.preview, &self.config, self.layout());
+        if max_y > 0.0 {
+            let panned = (self.pan.y + pixels).clamp(-max_y, max_y);
+            if (panned - self.pan.y).abs() > f32::EPSILON {
+                self.pan.y = panned;
+                self.wheel_travel = 0.0;
+                return Task::none();
+            }
+        }
+
+        self.wheel_travel += notches;
+        if self.wheel_travel.abs() < 1.0 {
+            return Task::none();
+        }
+        // Scrolling down (negative) is the next page.
+        let delta: isize = if self.wheel_travel < 0.0 { 1 } else { -1 };
+        self.wheel_travel = 0.0;
+
+        // Stopped at the first and last page rather than handed to `Page`,
+        // which moves to the next *file* when there is nowhere to page to.
+        let pages = page_count(&self.preview);
+        let target = self.page as isize + delta;
+        if pages <= 1 || target < 0 || target >= pages as isize {
+            return Task::none();
+        }
+
+        // The new page opens at the edge it was entered from: the top when
+        // reading on, the bottom when going back.
+        if max_y > 0.0 {
+            self.pan.y = if delta > 0 { max_y } else { -max_y };
+        }
+        self.update(Message::Page(delta))
+    }
+
     fn clamp_pan(&mut self) {
         let (max_x, max_y) =
             surface::max_pan(self.screen, &self.preview, &self.config, self.layout());
@@ -1513,6 +1593,13 @@ impl cosmic::Application for App {
                 self.render_page()
             }
 
+            Message::Wheel(delta) => self.wheel(delta),
+
+            Message::Modifiers(modifiers) => {
+                self.modifiers = modifiers;
+                Task::none()
+            }
+
             Message::Zoom(factor) => {
                 self.zoom = (self.zoom * factor).clamp(surface::MIN_ZOOM, surface::MAX_ZOOM);
                 self.clamp_pan();
@@ -2146,6 +2233,9 @@ fn keys(event: event::Event, _status: event::Status, _id: window::Id) -> Option<
         event::Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) => {
             crate::keys::message(&key, modifiers)
         }
+        event::Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) => {
+            Some(Message::Modifiers(modifiers))
+        }
         event::Event::Window(window::Event::Opened { size, .. }) => Some(Message::Configured(size)),
         event::Event::Window(window::Event::Resized(size)) => Some(Message::Configured(size)),
         _ => None,
@@ -2521,6 +2611,83 @@ mod tests {
         let flags = Flags::new(vec!["/tmp/a.png".to_owned()]);
         assert_eq!(flags.action().map(String::as_str), Some(SHOW_ACTION));
         assert_eq!(flags.args(), vec!["/tmp/a.png"]);
+    }
+
+    /// An app showing a three-page comic, the second of two files.
+    fn paged_app() -> App {
+        let mut app = app(Config::default());
+        app.around = Neighbourhood::from_list(
+            vec![
+                PathBuf::from("/nonexistent/a.cbz"),
+                PathBuf::from("/nonexistent/b.cbz"),
+            ],
+            0,
+        );
+        app.preview = Preview::Comic(Box::new(peek_engine::Comic {
+            raster: peek_engine::Raster::new(10, 14, vec![0; 10 * 14 * 4]).expect("pixels"),
+            page: 0,
+            pages: 3,
+        }));
+        app
+    }
+
+    fn notches(y: f32) -> Message {
+        Message::Wheel(ScrollDelta::Lines { x: 0.0, y })
+    }
+
+    #[test]
+    fn the_wheel_turns_a_documents_pages_rather_than_zooming_it() {
+        let mut app = paged_app();
+        let _ = app.update(notches(-1.0));
+        assert_eq!(app.page, 1, "scrolling down is the next page");
+        assert!((app.zoom - 1.0).abs() < f32::EPSILON, "and does not zoom");
+
+        let _ = app.update(notches(1.0));
+        assert_eq!(app.page, 0, "scrolling up goes back");
+    }
+
+    #[test]
+    fn touchpad_travel_turns_one_page_per_notch_of_distance() {
+        let mut app = paged_app();
+        for _ in 0..4 {
+            let _ = app.update(Message::Wheel(ScrollDelta::Pixels { x: 0.0, y: -10.0 }));
+        }
+        assert_eq!(app.page, 0, "40 px is less than a notch");
+        let _ = app.update(Message::Wheel(ScrollDelta::Pixels { x: 0.0, y: -10.0 }));
+        assert_eq!(app.page, 1);
+    }
+
+    #[test]
+    fn the_wheel_stops_at_the_last_page_rather_than_leaving_the_file() {
+        let mut app = paged_app();
+        app.page = 2;
+        let _ = app.update(notches(-1.0));
+        assert_eq!(app.page, 2);
+        assert_eq!(app.around.position().0, 1, "still on the first file");
+    }
+
+    #[test]
+    fn ctrl_and_the_wheel_zoom_a_document() {
+        let mut app = paged_app();
+        let _ = app.update(Message::Modifiers(keyboard::Modifiers::CTRL));
+        let _ = app.update(notches(1.0));
+        assert!(app.zoom > 1.0);
+        assert_eq!(app.page, 0);
+    }
+
+    #[test]
+    fn the_wheel_still_zooms_a_picture() {
+        let mut app = app(Config::default());
+        app.preview = Preview::Picture(Box::new(peek_engine::Picture {
+            raster: peek_engine::Raster::new(1, 1, vec![0; 4]).expect("a pixel"),
+            source_width: 1,
+            source_height: 1,
+            exif: Vec::new(),
+            scalable: false,
+            animation: None,
+        }));
+        let _ = app.update(notches(1.0));
+        assert!(app.zoom > 1.0);
     }
 
     #[test]
