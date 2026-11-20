@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Rebuilt against the current COSMIC libraries (libcosmic `be7937d`).
 - Built with Rust 1.100.0, now the minimum supported version (was 1.99.1).
 - SVG previews render with resvg 0.50. Built on zbus 6.4. peek-engine
   3.0.3 carries the resvg move and no longer depends on tokio, which it
