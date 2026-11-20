@@ -1,6 +1,6 @@
 [package]
 name = "peek-engine"
-version = "3.0.2"
+version = "3.0.3"
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -39,7 +39,6 @@ media = ["dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video", "dep:gstre
 
 [dependencies]
 serde.workspace = true
-tokio.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 
@@ -56,7 +55,7 @@ image = { version = "0.25", default-features = false, features = [
 ] }
 # SVG is a document format, not a raster one, so it needs a renderer rather
 # than a decoder.
-resvg = "0.49"
+resvg = "0.50"
 
 exif = { package = "kamadak-exif", version = "0.6" }
 

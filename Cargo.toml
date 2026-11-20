@@ -6,7 +6,7 @@ members = ["crates/peek-engine", "crates/peek-thumbnailer"]
 edition = "2024"
 # The channel `rust-toolchain.toml` pins: the compiler the Magnetar suite is
 # built and released with. Raise both together.
-rust-version = "1.99.1"
+rust-version = "1.100.0"
 repository = "https://github.com/Magnetar-OS/peek"
 # Poppler, the only PDF renderer actually shipped on a Linux desktop, is GPL.
 # That decides the licence for the whole workspace including the engine crate —
@@ -74,7 +74,7 @@ rust-embed = "8"
 
 # The previewer service is served on its own connection, separate from the one
 # libcosmic's single-instance support owns. See `src/previewer.rs`.
-zbus = { version = "6.2", default-features = false, features = ["tokio"] }
+zbus = { version = "6.4", default-features = false, features = ["tokio"] }
 
 # `Url` is what libcosmic hands back from a D-Bus `Open`, so paths have to make
 # the round trip through it.

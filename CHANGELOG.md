@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Built with Rust 1.100.0, now the minimum supported version (was 1.99.1).
+- SVG previews render with resvg 0.50. Built on zbus 6.4. peek-engine
+  3.0.3 carries the resvg move and no longer depends on tokio, which it
+  never used.
+
 ## [2.5.0] - 2026-11-09
 
 ### Changed
